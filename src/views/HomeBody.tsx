@@ -1,13 +1,17 @@
 import Cards from "./Cards";
-import WeeklyReport from "./WeeklyReport";
-import RecentTransactions from "./RecentTransactions";
+import WeeklyReport from "../components/WeeklyReport";
+import RecentTransactions from "../components/RecentTransactions";
 
-export default function HomeBody() {
+interface HomeBodyProps {
+  onNavigateToHistory?: () => void;
+}
+
+export default function HomeBody({ onNavigateToHistory }: HomeBodyProps) {
   return (
     <>
       <Cards />
       <WeeklyReport />
-      <RecentTransactions />
+      <RecentTransactions onViewAll={onNavigateToHistory} />
     </>
   );
 }

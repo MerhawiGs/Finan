@@ -75,7 +75,7 @@ const MOCK_ACCOUNTS = [
         cardType: "personal-account" as const,
     },
     { 
-        id: 3, 
+        id: 4, 
         accountName: "Investments", 
         icon: "HandCoins" as const, 
         availableBalance: 15300.00, 
@@ -84,9 +84,9 @@ const MOCK_ACCOUNTS = [
         cardType: "investment-card" as const, 
     },
     { 
-        id: 4, 
+        id: 5, 
         accountName: "Mine Plus", 
-        icon: "ShoppingCart" as const, 
+        icon: "Plus" as const, 
         availableBalance: 250.00, 
         initialBalance: 0.00, 
         targetBalance: 1500.00,

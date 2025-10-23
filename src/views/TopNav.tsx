@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { Wifi, WifiOff } from "lucide-react"; // install: npm install lucide-react
 import { useCardContext } from "../contexts/CardContext";
 
-export default function TopNav() {
+interface TopNavProps {
+  currentView?: string;
+}
+
+export default function TopNav({ currentView = 'dashboard' }: TopNavProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [fromInternet, setFromInternet] = useState(false);
   const { selectedCardGradient } = useCardContext();
@@ -61,11 +65,27 @@ export default function TopNav() {
   const textColor = selectedCardGradient?.textColorClass || 'text-gray-900';
   const borderColor = selectedCardGradient ? 'border-white/20' : 'border-gray-100';
 
+  // Get view title
+  const getViewTitle = (view: string) => {
+    switch (view) {
+      case 'dashboard': return 'Dashboard';
+      case 'history': return 'Transaction History';
+      case 'reports': return 'Financial Reports';
+      case 'settings': return 'Settings';
+      default: return 'Dashboard';
+    }
+  };
+
   return (
     <header className={`p-4 ${headerGradient} border-b ${borderColor} flex justify-between items-center sticky top-0 z-20 transition-all duration-500`}>
-      <h1 className={`text-2xl font-extrabold ${textColor}`}>
-        Hi, Merhawi!
-      </h1>
+      <div>
+        <h1 className={`text-2xl font-extrabold ${textColor}`}>
+          Hi, Merhawi!
+        </h1>
+        <p className={`text-sm ${selectedCardGradient ? 'text-white/80' : 'text-gray-600'}`}>
+          {getViewTitle(currentView)}
+        </p>
+      </div>
 
       <div className="flex items-center space-x-2">
         <span className={`text-sm font-medium ${selectedCardGradient ? 'text-white/90' : 'text-gray-500'}`}>
