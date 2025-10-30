@@ -68,7 +68,7 @@ const MOCK_ACCOUNTS = [
     { 
         id: 3, 
         accountName: "Personal Account", 
-        icon: "Landmark" as const, 
+        icon: "CircleUserRound" as const, 
         availableBalance: 10000.50, // Remaining debt
         initialBalance: 2000.00, // Initial debt
         targetBalance: 0.00, // Goal is zero debt

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, TrendingUp, TrendingDown, CheckCircle, Wallet, Landmark, HandCoins } from 'lucide-react';
+import { Plus,CircleUserRound, TrendingUp, TrendingDown, CheckCircle, Wallet, Landmark, HandCoins } from 'lucide-react';
 
 // Enforced fixed width (320px) and height (224px) for visual consistency
 export const CARD_SIZING = 'flex-shrink-0 w-80 h-56';
@@ -7,7 +7,7 @@ export const CARD_SIZING = 'flex-shrink-0 w-80 h-56';
 interface FinancialCardProps {
   accountName: string;
   // Updated to include only the four specific types
-  icon: 'Wallet' | 'Landmark' | 'HandCoins' | 'TrendingUp' | 'TrendingDown' | 'Plus';
+  icon: 'Wallet' | 'Landmark' | 'CircleUserRound' | 'HandCoins' | 'TrendingUp' | 'TrendingDown' | 'Plus';
   availableBalance: number;
   initialBalance: number;
   targetBalance: number;
@@ -62,6 +62,7 @@ export default function FinancialCard({
   switch (icon) {
       case 'Wallet': iconComponent = Wallet; break;
       case 'Landmark': iconComponent = Landmark; break;
+      case 'CircleUserRound': iconComponent = CircleUserRound; break;
       case 'HandCoins': iconComponent = HandCoins; break;
       case 'TrendingUp': iconComponent = TrendingUp; break;
       case 'TrendingDown': iconComponent = TrendingDown; break;
