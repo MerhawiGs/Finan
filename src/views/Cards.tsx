@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import FinancialCard from "../components/Card";
+import FinancialCard, { CARD_SIZING } from "../components/Card";
 import { ChevronRight } from "lucide-react";
 import { useCardContext } from "../contexts/CardContext";
 import { Link } from 'react-router-dom'
@@ -153,7 +153,33 @@ export default function Cards() {
       {/* Carousel Container: Horizontal Scroll */}
       <div className="flex gap-4 overflow-x-auto justify-start p-4 hide-scrollbar">
         {loading ? (
-          <div className="p-6">Loading cards...</div>
+          // Skeleton placeholders matching the card size and layout
+          Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className={`${CARD_SIZING} animate-pulse p-5 flex flex-col rounded-xl shadow-lg bg-gray-200/60`}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-lg bg-white/60" />
+                  <div className="h-4 w-32 rounded bg-white/60" />
+                </div>
+                <div className="h-3 w-12 rounded bg-white/60" />
+              </div>
+
+              <div className="flex flex-col items-start space-y-1 mb-4">
+                <div className="h-8 w-48 rounded bg-white/60" />
+                <div className="h-3 w-28 rounded bg-white/40 mt-2" />
+              </div>
+
+              <div className="mt-auto w-full pt-3 border-t" style={{ borderColor: 'rgba(0,0,0,0.08)'}}>
+                <div className="flex justify-between items-center mb-1">
+                  <div className="h-3 w-24 rounded bg-white/40" />
+                  <div className="h-3 w-8 rounded bg-white/60" />
+                </div>
+                <div className={`w-full bg-white/30 rounded-full h-2`}>
+                  <div className={`h-2 rounded-full bg-white`} style={{ width: `30%` }} />
+                </div>
+              </div>
+            </div>
+          ))
         ) : (
           cards.map((account: any) => (
             <FinancialCard
