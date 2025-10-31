@@ -32,7 +32,7 @@ export default function FinancialCard({
   
   // --- Progress & Description Logic ---
   let progressPercentage = 0;
-  let progressDescription = `Target: ${targetBalance.toLocaleString('en-US', { style: 'currency', currency: 'ETB' })}`;
+  let progressDescription = cardType === 'credit-card' ? `Budget: ${targetBalance.toLocaleString('en-US', { style: 'currency', currency: 'ETB' })}` : `Target: ${targetBalance.toLocaleString('en-US', { style: 'currency', currency: 'ETB' })}`;
   
   const range = targetBalance - initialBalance;
   const currentProgress = availableBalance - initialBalance;
@@ -165,7 +165,7 @@ export default function FinancialCard({
       <div className="mt-auto w-full pt-3 border-t" style={{ borderColor: cardType === 'mine-plus' ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.3)'}} aria-hidden={false}>
         <div className="flex justify-between items-center mb-1">
           <span className={`text-xs ${cardType === 'mine-plus' ? 'text-slate-800/90' : 'text-white/90'}`}>
-            {cardType === 'credit-card' && availableBalance < 0 ? 'Debt Repaid' : 'Goal Progress'}
+            {cardType === 'credit-card' && availableBalance < 0 ? 'Debt Repaid' : 'Account Progress'}
           </span>
           <span className={`text-xs font-medium ${textColorClass}`}>{Math.round(safeProgressPercent)}%</span>
         </div>
