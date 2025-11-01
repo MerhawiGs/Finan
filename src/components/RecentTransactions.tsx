@@ -4,7 +4,8 @@ import {
   Car, Coffee, Gamepad2, BookOpen, Heart, 
   Smartphone, Zap, Briefcase, Gift
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { useCardContext } from '../contexts/CardContext';
 
 type TransactionType = 'income' | 'expense';
 
@@ -25,86 +26,86 @@ interface RecentTransactionsProps {
 }
 
 const mockTransactions: Transaction[] = [
-  { 
-    id: 't1', 
-    title: 'Apartment Rent', 
-    category: 'Housing', 
-    date: '2025-01-15', 
-    amount: 12000, 
-    type: 'expense',
-    description: 'Monthly rent payment',
-    status: 'completed'
-  },
-  { 
-    id: 't2', 
-    title: 'Grocery Shopping', 
-    category: 'Groceries', 
-    date: '2025-01-14', 
-    amount: 942.30, 
-    type: 'expense',
-    description: 'Weekly groceries at Shoa Market',
-    status: 'completed'
-  },
-  { 
-    id: 't3', 
-    title: 'Salary Payment', 
-    category: 'Income', 
-    date: '2025-01-10', 
-    amount: 42000, 
-    type: 'income',
-    description: 'Monthly salary from TechCorp',
-    status: 'completed'
-  },
-  { 
-    id: 't4', 
-    title: 'Stock Dividend', 
-    category: 'Investments', 
-    date: '2025-01-08', 
-    amount: 545.00, 
-    type: 'income',
-    description: 'Quarterly dividend from EEPCo',
-    status: 'completed'
-  },
-  { 
-    id: 't5', 
-    title: 'Coffee Shop', 
-    category: 'Food & Drink', 
-    date: '2025-01-13', 
-    amount: 85.50, 
-    type: 'expense',
-    description: 'Morning coffee at Tomoca',
-    status: 'completed'
-  },
-  { 
-    id: 't6', 
-    title: 'Uber Ride', 
-    category: 'Transportation', 
-    date: '2025-01-12', 
-    amount: 120.00, 
-    type: 'expense',
-    description: 'Ride to Bole Airport',
-    status: 'completed'
-  },
-  { 
-    id: 't7', 
-    title: 'Freelance Project', 
-    category: 'Income', 
-    date: '2025-01-11', 
-    amount: 5000.00, 
-    type: 'income',
-    description: 'Web development project',
-    status: 'completed'
-  },
-  { 
-    id: 't8', 
-    title: 'Phone Bill', 
-    category: 'Utilities', 
-    date: '2025-01-09', 
-    amount: 250.00, 
-    type: 'expense',
-    description: 'Monthly mobile subscription',
-    status: 'pending'
-  }
+  // { 
+  //   id: 't1', 
+  //   title: 'Apartment Rent', 
+  //   category: 'Housing', 
+  //   date: '2025-01-15', 
+  //   amount: 12000, 
+  //   type: 'expense',
+  //   description: 'Monthly rent payment',
+  //   status: 'completed'
+  // },
+  // { 
+  //   id: 't2', 
+  //   title: 'Grocery Shopping', 
+  //   category: 'Groceries', 
+  //   date: '2025-01-14', 
+  //   amount: 942.30, 
+  //   type: 'expense',
+  //   description: 'Weekly groceries at Shoa Market',
+  //   status: 'completed'
+  // },
+  // { 
+  //   id: 't3', 
+  //   title: 'Salary Payment', 
+  //   category: 'Income', 
+  //   date: '2025-01-10', 
+  //   amount: 42000, 
+  //   type: 'income',
+  //   description: 'Monthly salary from TechCorp',
+  //   status: 'completed'
+  // },
+  // { 
+  //   id: 't4', 
+  //   title: 'Stock Dividend', 
+  //   category: 'Investments', 
+  //   date: '2025-01-08', 
+  //   amount: 545.00, 
+  //   type: 'income',
+  //   description: 'Quarterly dividend from EEPCo',
+  //   status: 'completed'
+  // },
+  // { 
+  //   id: 't5', 
+  //   title: 'Coffee Shop', 
+  //   category: 'Food & Drink', 
+  //   date: '2025-01-13', 
+  //   amount: 85.50, 
+  //   type: 'expense',
+  //   description: 'Morning coffee at Tomoca',
+  //   status: 'completed'
+  // },
+  // { 
+  //   id: 't6', 
+  //   title: 'Uber Ride', 
+  //   category: 'Transportation', 
+  //   date: '2025-01-12', 
+  //   amount: 120.00, 
+  //   type: 'expense',
+  //   description: 'Ride to Bole Airport',
+  //   status: 'completed'
+  // },
+  // { 
+  //   id: 't7', 
+  //   title: 'Freelance Project', 
+  //   category: 'Income', 
+  //   date: '2025-01-11', 
+  //   amount: 5000.00, 
+  //   type: 'income',
+  //   description: 'Web development project',
+  //   status: 'completed'
+  // },
+  // { 
+  //   id: 't8', 
+  //   title: 'Phone Bill', 
+  //   category: 'Utilities', 
+  //   date: '2025-01-09', 
+  //   amount: 250.00, 
+  //   type: 'expense',
+  //   description: 'Monthly mobile subscription',
+  //   status: 'pending'
+  // }
 ];
 
 function formatCurrency(n: number) {
@@ -182,12 +183,22 @@ function getCategoryColor(category: string) {
   }
 }
 
+// const API = 'http://localhost:3000';
+const API = import.meta.env.VITE_API_URL ?? 'https://finan-back-qmph.onrender.com';
+
 export default function RecentTransactions({ transactions, onViewAll }: RecentTransactionsProps) {
+  const { selectedCardId } = useCardContext();
   const [filter, setFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
+  const [fetched, setFetched] = useState<Transaction[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
+  // decide source: prefer passed-in transactions, otherwise fetched, otherwise mock
+  const sourceTransactions = transactions && transactions.length ? transactions : (fetched && fetched.length ? fetched : mockTransactions);
+
   const items = useMemo(() => {
-    let filtered = transactions && transactions.length ? transactions : mockTransactions;
+    let filtered = sourceTransactions;
     
     // Apply filter
     if (filter !== 'all') {
@@ -205,20 +216,73 @@ export default function RecentTransactions({ transactions, onViewAll }: RecentTr
     
     // Limit to 7 most recent transactions
     return filtered.slice(0, 7);
-  }, [transactions, filter, sortBy]);
+  }, [sourceTransactions, filter, sortBy]);
 
   // Calculate statistics
   const stats = useMemo(() => {
-    const allTransactions = transactions && transactions.length ? transactions : mockTransactions;
+    const allTransactions = sourceTransactions;
     const income = allTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
     const expenses = allTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
     const net = income - expenses;
     
     return { income, expenses, net, count: allTransactions.length };
-  }, [transactions]);
+  }, [sourceTransactions]);
+
+  // fetch transactions from backend when component mounts or when selectedCardId changes
+  useEffect(() => {
+    let mounted = true;
+    async function fetchTx() {
+      setLoading(true);
+      setError(null);
+      try {
+        const url = selectedCardId ? `${API}/transactions/card/${selectedCardId}` : `${API}/transactions`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Server returned ${res.status}`);
+        const data = await res.json();
+        // map server transaction objects to component Transaction shape
+        const mapped: Transaction[] = (data || []).map((t: any) => ({
+          id: t._id || t.id,
+          title: t.title || t.name || 'Transaction',
+          category: t.category || 'Other',
+          date: t.createdAt || t.date || new Date().toISOString(),
+          amount: typeof t.amount === 'number' ? t.amount : Number(t.amount || 0),
+          type: t.type === 'income' ? 'income' : 'expense',
+          description: t.remark || t.description || '',
+          status: t.status || 'completed'
+        }));
+
+        if (mounted) setFetched(mapped);
+      } catch (err: any) {
+        if (mounted) setError(err.message || 'Failed to fetch');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    fetchTx();
+
+    // re-fetch when a transaction is created elsewhere
+    const onCreated = () => fetchTx();
+    window.addEventListener('transaction:created', onCreated as EventListener);
+
+    return () => {
+      mounted = false;
+      window.removeEventListener('transaction:created', onCreated as EventListener);
+    };
+  }, [selectedCardId]);
 
   return (
     <div className="w-full max-w-4xl p-4 mt-4">
+      {error && (
+        <div className="mb-4 p-3 rounded-lg bg-rose-50 text-rose-700 border border-rose-100">
+          Failed to load transactions: {error}
+        </div>
+      )}
+      {loading && (
+        <div className="mb-4 p-3 rounded-lg bg-slate-50 text-slate-600 border border-slate-100">
+          Loading transactions...
+        </div>
+      )}
       {/* Header with Statistics */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
         <div>

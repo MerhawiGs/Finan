@@ -1,25 +1,98 @@
+import { useEffect, useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts';
 import { ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { useCardContext } from '../contexts/CardContext';
 
-const data = [
-  { name: 'Mon', inc: 2400, exp: -400 },
-  { name: 'Tue', inc: 1800, exp: -600 },
-  { name: 'Wed', inc: 2200, exp: -200 },
-  { name: 'Thu', inc: 2000, exp: -800 },
-  { name: 'Fri', inc: 2600, exp: -300 },
-  { name: 'Sat', inc: 1700, exp: -700 },
-  { name: 'Sun', inc: 2100, exp: -100 },
-];
+// const API = 'http://localhost:3000';
+const API = import.meta.env.VITE_API_URL ?? 'https://finan-back-qmph.onrender.com';
 
-function sumKey(arr: any[], key: string) {
-  return arr.reduce((s, it) => s + (it[key] || 0), 0);
+type Tx = {
+  id: string;
+  amount: number;
+  type: 'income' | 'expense';
+  createdAt?: string;
+};
+
+function getLastNDates(n: number) {
+  const arr: { iso: string; label: string }[] = [];
+  const now = new Date();
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(now.getDate() - i);
+    const iso = d.toISOString();
+    const label = d.toLocaleDateString('en-US', { weekday: 'short' });
+    arr.push({ iso, label });
+  }
+  return arr;
 }
 
 export default function WeeklyReport() {
-  const totalInc = sumKey(data, 'inc');
-  const totalExp = Math.abs(sumKey(data, 'exp'));
-  const net = totalInc - totalExp;
+  const { selectedCardId } = useCardContext();
+  const [txs, setTxs] = useState<Tx[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const url = selectedCardId ? `${API}/transactions/card/${selectedCardId}` : `${API}/transactions`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Server returned ${res.status}`);
+        const data = await res.json();
+        const mapped: Tx[] = (data || []).map((t: any) => ({
+          id: t._id || t.id,
+          amount: Number(t.amount || 0),
+          type: t.type === 'income' ? 'income' : 'expense',
+          createdAt: t.createdAt || t.date || new Date().toISOString(),
+        }));
+        if (mounted) setTxs(mapped);
+      } catch (err: any) {
+        if (mounted) setError(err.message || 'Failed to load');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    load();
+
+    const onCreated = () => load();
+    window.addEventListener('transaction:created', onCreated as EventListener);
+    return () => {
+      mounted = false;
+      window.removeEventListener('transaction:created', onCreated as EventListener);
+    };
+  }, [selectedCardId]);
+
+  const last7 = useMemo(() => getLastNDates(7), []);
+
+  const data = useMemo(() => {
+    // initialize with zeros
+    const base = last7.map(d => ({ name: d.label, inc: 0, exp: 0 }));
+
+    const source = txs && txs.length ? txs : [];
+
+    for (const t of source) {
+      const date = t.createdAt ? new Date(t.createdAt) : new Date();
+      // find matching day (by date string)
+      for (let i = 0; i < last7.length; i++) {
+        const dIso = new Date(last7[i].iso);
+        if (dIso.getFullYear() === date.getFullYear() && dIso.getMonth() === date.getMonth() && dIso.getDate() === date.getDate()) {
+          if (t.type === 'income') base[i].inc += Math.abs(t.amount);
+          else base[i].exp -= Math.abs(t.amount); // keep expenses negative for chart
+          break;
+        }
+      }
+    }
+
+    return base;
+  }, [txs, last7]);
+
+  const totalInc = data.reduce((s, it) => s + (it.inc || 0), 0);
+  const totalExp = Math.abs(data.reduce((s, it) => s + (it.exp || 0), 0));
+  const net = totalInc - totalExp;
   const isPositive = net >= 0;
 
   return (
@@ -46,6 +119,9 @@ export default function WeeklyReport() {
           <div className="text-sm text-slate-600">Income: <span className="font-medium text-slate-800">${totalInc.toLocaleString()}</span></div>
           <div className="text-sm text-slate-600">Expenses: <span className="font-medium text-slate-800">${totalExp.toLocaleString()}</span></div>
         </div>
+
+        {loading && <div className="py-6 text-center text-sm text-slate-500">Loading weekly data…</div>}
+        {error && <div className="py-4 text-center text-sm text-rose-600">Failed to load data: {error}</div>}
 
         <div style={{ width: '100%', height: '220px' }}>
           <ResponsiveContainer width="100%" height="100%">

@@ -11,7 +11,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeView, setView, onAddClick }
     // Icons were updated in the previous step: History (Clock3) and Reports (BarChart3)
     const navItems = [
         { name: 'Home', icon: Home, view: 'dashboard' },
-        { name: 'History', icon: Clock3, view: 'history' },
+        { name: 'Budget', icon: Clock3, view: 'history' },
         { name: 'Reports', icon: BarChart3, view: 'reports' },
         { name: 'Settings', icon: Settings, view: 'settings' },
     ];
@@ -26,7 +26,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeView, setView, onAddClick }
                 
                 {/* Left Items */}
                 <nav aria-label="Primary" className="flex space-x-12">
-                    {leftItems.map((item) => {
+                    { leftItems.map((item) => {
                         const Icon = item.icon;
                         const isActive = activeView === item.view;
                         const colorClass = isActive ? 'text-indigo-600' : 'text-gray-500 hover:text-indigo-500';

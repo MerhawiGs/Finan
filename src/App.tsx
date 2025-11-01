@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import TopNav from './views/TopNav';
 import HomeBody from './views/HomeBody';
@@ -7,7 +7,7 @@ import Reports from './views/Reports';
 import Settings from './views/Settings';
 import BottomNav from './views/BottomNav';
 import ManageCards from './views/ManageCards';
-import { CardProvider } from './contexts/CardContext';
+import AddTransactionModal from './components/AddTransactionModal';
 
 function NotFound() {
   return (
@@ -21,6 +21,7 @@ function NotFound() {
 export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const pathToView = (path: string) => {
     switch (path) {
@@ -44,30 +45,28 @@ export default function App() {
     }
   };
 
-  const handleAddClick = () => {
-    console.log('Add new transaction clicked');
-  };
+  const handleAddClick = () => setShowAddModal(true);
 
   return (
-    <CardProvider>
-      <div className="min-h-screen bg-slate-50">
-        <TopNav currentView={activeView} />
-        <main className="pb-20">
-          <Routes>
-            <Route path="/" element={<HomeBody />} />
-            <Route path="/history" element={<History />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/manage-cards" element={<ManageCards />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </main>
-        <BottomNav 
-          activeView={activeView}
-          setView={setView}
-          onAddClick={handleAddClick}
-        />
-      </div>
-    </CardProvider>
+    <div className="min-h-screen bg-slate-50">
+      <TopNav currentView={activeView} />
+      <main className="pb-20">
+        <Routes>
+          <Route path="/" element={<HomeBody />} />
+          <Route path="/history" element={<History />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/manage-cards" element={<ManageCards />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </main>
+      <BottomNav 
+        activeView={activeView}
+        setView={setView}
+        onAddClick={handleAddClick}
+      />
+
+      <AddTransactionModal open={showAddModal} onClose={() => setShowAddModal(false)} />
+    </div>
   );
 }

@@ -47,6 +47,7 @@ const getCardGradientInfo = (cardType: string) => {
 };
 
 // API base
+// const API = 'http://localhost:3000';
 const API = import.meta.env.VITE_API_URL ?? 'https://finan-back-qmph.onrender.com';
 
 // Mock Data Structure (Embedded for demonstration)
@@ -100,7 +101,7 @@ const MOCK_ACCOUNTS = [
 ];
 
 export default function Cards() {
-  const { setSelectedCardGradient } = useCardContext();
+  const { setSelectedCardGradient, setSelectedCardId } = useCardContext();
   const [cards, setCards] = useState<any[]>(MOCK_ACCOUNTS);
   const [activeAccountId, setActiveAccountId] = useState<string>(MOCK_ACCOUNTS[0]._id);
   const [loading, setLoading] = useState(false);
@@ -119,6 +120,7 @@ export default function Cards() {
         if (data.length > 0) {
           const firstId = data[0]._id || data[0].id;
           setActiveAccountId(firstId);
+          setSelectedCardId(firstId);
           const gradientInfo = getCardGradientInfo(data[0].cardType);
           setSelectedCardGradient(gradientInfo);
         } else {
@@ -136,11 +138,16 @@ export default function Cards() {
     };
 
     fetchCards();
-    return () => { mounted = false; };
+
+    const onTxn = () => { fetchCards(); };
+    window.addEventListener('transaction:created', onTxn as EventListener);
+
+    return () => { mounted = false; window.removeEventListener('transaction:created', onTxn as EventListener); };
   }, [setSelectedCardGradient]);
 
   const handleCardSelect = (accountId: string) => {
     setActiveAccountId(accountId);
+    setSelectedCardId(accountId);
     const selectedAccount = cards.find(account => (account._id || account.id) === accountId);
     if (selectedAccount) {
       const gradientInfo = getCardGradientInfo(selectedAccount.cardType);

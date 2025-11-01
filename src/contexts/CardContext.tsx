@@ -12,6 +12,8 @@ interface CardGradient {
 interface CardContextType {
   selectedCardGradient: CardGradient | null;
   setSelectedCardGradient: (gradient: CardGradient | null) => void;
+  selectedCardId: string | null;
+  setSelectedCardId: (id: string | null) => void;
 }
 
 const CardContext = createContext<CardContextType | undefined>(undefined);
@@ -30,9 +32,10 @@ interface CardProviderProps {
 
 export const CardProvider: React.FC<CardProviderProps> = ({ children }) => {
   const [selectedCardGradient, setSelectedCardGradient] = useState<CardGradient | null>(null);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
 
   return (
-    <CardContext.Provider value={{ selectedCardGradient, setSelectedCardGradient }}>
+    <CardContext.Provider value={{ selectedCardGradient, setSelectedCardGradient, selectedCardId, setSelectedCardId }}>
       {children}
     </CardContext.Provider>
   );
