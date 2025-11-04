@@ -3,6 +3,8 @@ import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import TopNav from './views/TopNav';
 import HomeBody from './views/HomeBody';
 import History from './views/History';
+import Planner from './views/Planner';
+import TaskManager from './views/TaskManager';
 import Reports from './views/Reports';
 import Settings from './views/Settings';
 import BottomNav from './views/BottomNav';
@@ -27,6 +29,8 @@ export default function App() {
     switch (path) {
       case '/': return 'dashboard';
       case '/history': return 'history';
+      case '/planner': return 'planner';
+      case '/taskmanager': return 'taskmanager';
       case '/reports': return 'reports';
       case '/settings': return 'settings';
       default: return 'dashboard';
@@ -38,7 +42,7 @@ export default function App() {
   const setView = (view: string) => {
     switch (view) {
       case 'dashboard': return navigate('/');
-      case 'history': return navigate('/history');
+      case 'planner': return navigate('/planner');
       case 'reports': return navigate('/reports');
       case 'settings': return navigate('/settings');
       default: return navigate('/');
@@ -53,7 +57,8 @@ export default function App() {
       <main className="pb-20">
         <Routes>
           <Route path="/" element={<HomeBody />} />
-          <Route path="/history" element={<History />} />
+          <Route path="/taskmanager" element={<TaskManager />} />
+          <Route path="/planner" element={<Planner />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/manage-cards" element={<ManageCards />} />

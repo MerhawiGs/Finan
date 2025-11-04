@@ -3,9 +3,9 @@ import { BarChart, Bar, XAxis, CartesianGrid, Tooltip, ReferenceLine, Responsive
 import { ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { useCardContext } from '../contexts/CardContext';
 
-// const API = 'http://localhost:3000';
-const API = import.meta.env.VITE_API_URL ?? 'https://finan-back-qmph.onrender.com';
-
+const API = 'http://localhost:3000';
+// const API = import.meta.env.VITE_API_URL ?? 'https://finan-back-qmph.onrender.com';
+// const API = import.meta.env.VITE_API_URL;
 type Tx = {
   id: string;
   amount: number;

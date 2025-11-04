@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   TrendingUp, TrendingDown, DollarSign, Target, AlertCircle, 
   Download, Share2, EyeOff,
@@ -7,21 +7,7 @@ import {
   Lightbulb
 } from 'lucide-react';
 
-// Mock data for comprehensive reports
-const mockTransactions = [
-  { id: 't1', title: 'Apartment Rent', category: 'Housing', date: '2025-01-15', amount: 12000, type: 'expense' },
-  { id: 't2', title: 'Grocery Shopping', category: 'Groceries', date: '2025-01-14', amount: 942.30, type: 'expense' },
-  { id: 't3', title: 'Salary Payment', category: 'Income', date: '2025-01-10', amount: 42000, type: 'income' },
-  { id: 't4', title: 'Stock Dividend', category: 'Investments', date: '2025-01-08', amount: 545.00, type: 'income' },
-  { id: 't5', title: 'Coffee Shop', category: 'Food & Drink', date: '2025-01-13', amount: 85.50, type: 'expense' },
-  { id: 't6', title: 'Uber Ride', category: 'Transportation', date: '2025-01-12', amount: 120.00, type: 'expense' },
-  { id: 't7', title: 'Freelance Project', category: 'Income', date: '2025-01-11', amount: 5000.00, type: 'income' },
-  { id: 't8', title: 'Phone Bill', category: 'Utilities', date: '2025-01-09', amount: 250.00, type: 'expense' },
-  { id: 't9', title: 'Gym Membership', category: 'Health', date: '2025-01-08', amount: 500.00, type: 'expense' },
-  { id: 't10', title: 'Online Course', category: 'Education', date: '2025-01-07', amount: 1200.00, type: 'expense' },
-  { id: 't11', title: 'Restaurant', category: 'Food & Drink', date: '2025-01-06', amount: 350.00, type: 'expense' },
-  { id: 't12', title: 'Gas Station', category: 'Transportation', date: '2025-01-05', amount: 180.00, type: 'expense' },
-];
+// We'll load transactions and cards dynamically from the API
 
 const mockBudgets = [
   { category: 'Housing', budget: 15000, spent: 12000, color: 'bg-blue-500' },
@@ -34,10 +20,12 @@ const mockBudgets = [
 ];
 
 const mockGoals = [
-  { title: 'Emergency Fund', target: 50000, current: 25000, deadline: '2025-12-31', priority: 'high' },
-  { title: 'Vacation Fund', target: 15000, current: 8000, deadline: '2025-06-30', priority: 'medium' },
-  { title: 'New Laptop', target: 30000, current: 12000, deadline: '2025-03-31', priority: 'low' },
+  { id: 'g1', title: 'Emergency Fund', target: 50000, current: 25000, deadline: '2025-12-31', priority: 'high', completed: false },
+  { id: 'g2', title: 'Vacation Fund', target: 15000, current: 8000, deadline: '2025-06-30', priority: 'medium', completed: false },
+  { id: 'g3', title: 'New Laptop', target: 30000, current: 12000, deadline: '2025-03-31', priority: 'low', completed: false },
 ];
+
+const API_BASE = (import.meta as any).env.VITE_API_URL || 'http://localhost:3000';
 
 function formatCurrency(amount: number) {
   return amount.toLocaleString('en-ET', { style: 'currency', currency: 'ETB' });
@@ -71,6 +59,70 @@ function getPriorityColor(priority: string) {
 export default function Reports() {
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'quarter' | 'year'>('month');
   const [showInsights, setShowInsights] = useState(true);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [cards, setCards] = useState<any[]>([]);
+
+  // goals persisted in localStorage (simple client-side persistence)
+  const [goals, setGoals] = useState<any[]>(() => {
+    try {
+      const raw = localStorage.getItem('finan_goals_v1');
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return mockGoals;
+  });
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+
+  // Add-goal modal state
+  const [showAddGoal, setShowAddGoal] = useState(false);
+  const [newGoalTitle, setNewGoalTitle] = useState('');
+  const [newGoalTarget, setNewGoalTarget] = useState<number | ''>('');
+  const [newGoalDeadline, setNewGoalDeadline] = useState('');
+  const [newGoalPriority, setNewGoalPriority] = useState<'high' | 'medium' | 'low'>('medium');
+
+  // Add-money modal state
+  const [showAddMoney, setShowAddMoney] = useState(false);
+  const [moneyGoalId, setMoneyGoalId] = useState<string | null>(null);
+  const [moneyAmount, setMoneyAmount] = useState<number | ''>('');
+  const [moneyCardId, setMoneyCardId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onTxCreated = () => fetchData();
+    window.addEventListener('transaction:created', onTxCreated as EventListener);
+    fetchData();
+    return () => window.removeEventListener('transaction:created', onTxCreated as EventListener);
+  }, []);
+
+  async function fetchData() {
+    setLoading(true);
+    setError(null);
+    try {
+      const txRes = await fetch(`${API_BASE}/transactions`);
+      const txJson = await txRes.json();
+      // normalise createdAt/date
+      const txs = Array.isArray(txJson) ? txJson.map((t: any) => ({
+        ...t,
+        date: t.createdAt || t.date || new Date().toISOString()
+      })) : [];
+      setTransactions(txs);
+
+      const cardsRes = await fetch(`${API_BASE}/cards`);
+      const cardsJson = await cardsRes.json();
+      setCards(Array.isArray(cardsJson) ? cardsJson : []);
+    } catch (err: any) {
+      console.warn(err);
+      setError(err?.message || 'Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // persist goals
+  useEffect(() => {
+    try { localStorage.setItem('finan_goals_v1', JSON.stringify(goals)); } catch (e) {}
+  }, [goals]);
 
   // Calculate comprehensive analytics
   const analytics = useMemo(() => {
@@ -78,24 +130,24 @@ export default function Reports() {
     const currentYear = new Date().getFullYear();
     
     // Filter transactions based on time range
-    let filteredTransactions = mockTransactions;
+    let filteredTransactions = transactions;
     const now = new Date();
     
     if (timeRange === 'week') {
       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      filteredTransactions = mockTransactions.filter(t => new Date(t.date) >= weekAgo);
+      filteredTransactions = transactions.filter((t: any) => new Date(t.date) >= weekAgo);
     } else if (timeRange === 'month') {
-      filteredTransactions = mockTransactions.filter(t => {
+      filteredTransactions = transactions.filter((t: any) => {
         const tDate = new Date(t.date);
         return tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear;
       });
     } else if (timeRange === 'quarter') {
       const quarterStart = new Date(currentYear, Math.floor(currentMonth / 3) * 3, 1);
-      filteredTransactions = mockTransactions.filter(t => new Date(t.date) >= quarterStart);
+      filteredTransactions = transactions.filter((t: any) => new Date(t.date) >= quarterStart);
     }
 
-    const income = filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-    const expenses = filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+    const income = filteredTransactions.filter((t: any) => t.type === 'income').reduce((sum: number, t: any) => sum + (t.amount || 0), 0);
+    const expenses = filteredTransactions.filter((t: any) => t.type === 'expense').reduce((sum: number, t: any) => sum + (t.amount || 0), 0);
     const net = income - expenses;
 
     // Category breakdown
@@ -107,8 +159,8 @@ export default function Reports() {
       }, {} as Record<string, number>);
 
     // Top spending categories
-    const topCategories = Object.entries(categoryBreakdown)
-      .sort(([,a], [,b]) => b - a)
+    const topCategories = (Object.entries(categoryBreakdown) as [string, number][])
+      .sort(([,a],[,b]) => b - a)
       .slice(0, 5);
 
     // Budget performance
@@ -172,7 +224,7 @@ export default function Reports() {
     }
 
     // Goal progress insights
-    const nearGoal = mockGoals.filter(g => (g.current / g.target) > 0.8);
+  const nearGoal = goals.filter((g: any) => (g.current / g.target) > 0.8 && !g.completed);
     if (nearGoal.length > 0) {
       insights.push({
         type: 'info',
@@ -185,6 +237,58 @@ export default function Reports() {
 
     return insights;
   }, [analytics, timeRange]);
+
+  // Goal helpers
+  function openAddMoneyModal(goalId: string) {
+    setMoneyGoalId(goalId);
+    setMoneyAmount('');
+    setMoneyCardId(cards.length ? cards[0]._id : null);
+    setShowAddMoney(true);
+  }
+
+  async function submitAddMoney() {
+    if (!moneyGoalId || !moneyCardId || !moneyAmount || Number(moneyAmount) <= 0) return;
+    const amount = Number(moneyAmount);
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE}/cards/${moneyCardId}/transaction`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'expense', amount, title: `Goal: ${moneyGoalId}`, category: 'Goal', remark: `Add to goal` })
+      });
+      if (!res.ok) throw new Error('Failed to charge card');
+      await res.json();
+
+      // update goal local state (use id match)
+  setGoals((prev: any[]) => prev.map((g: any) => g.id === moneyGoalId ? { ...g, current: (Number(g.current) || 0) + amount } : g));
+      // notify other parts of the app
+      window.dispatchEvent(new CustomEvent('transaction:created'));
+      setShowAddMoney(false);
+    } catch (err: any) {
+      console.warn(err);
+      setError(err?.message || 'Failed to add money');
+    } finally { setLoading(false); }
+  }
+
+  function submitNewGoal() {
+    if (!newGoalTitle || !newGoalTarget) return;
+    const g = {
+      id: `g_${Date.now()}`,
+      title: newGoalTitle,
+      target: Number(newGoalTarget),
+      current: 0,
+      deadline: newGoalDeadline || new Date().toISOString(),
+      priority: newGoalPriority,
+      completed: false
+    };
+  setGoals((prev: any[]) => [g, ...prev]);
+    setShowAddGoal(false);
+    setNewGoalTitle(''); setNewGoalTarget(''); setNewGoalDeadline(''); setNewGoalPriority('medium');
+  }
+
+  function markGoalComplete(id: string) {
+  setGoals((prev: any[]) => prev.map((g: any) => g.id === id ? { ...g, completed: true, current: g.target } : g));
+  }
 
   return (
     <div className="w-full max-w-6xl mx-auto p-4 space-y-6">
@@ -221,6 +325,14 @@ export default function Reports() {
           </button>
         </div>
       </div>
+
+      {loading && (
+        <div className="text-sm text-slate-600">Loading financial data…</div>
+      )}
+
+      {error && (
+        <div className="text-sm text-red-600">{error}</div>
+      )}
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -334,9 +446,9 @@ export default function Reports() {
                   <span className="font-medium text-slate-800">{category}</span>
                 </div>
                 <div className="text-right">
-                  <div className="font-semibold text-slate-800">{formatCurrency(amount)}</div>
+                  <div className="font-semibold text-slate-800">{formatCurrency(Number(amount))}</div>
                   <div className="text-xs text-slate-500">
-                    {((amount / analytics.expenses) * 100).toFixed(1)}%
+                    {((Number(amount) / analytics.expenses) * 100).toFixed(1)}%
                   </div>
                 </div>
               </div>
@@ -386,42 +498,98 @@ export default function Reports() {
 
       {/* Financial Goals */}
       <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
-        <h3 className="text-lg font-semibold text-slate-800 mb-4">Financial Goals</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-slate-800">Financial Goals</h3>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowAddGoal(true)} className="px-3 py-1 bg-indigo-600 text-white rounded-md text-sm">Add Goal</button>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {mockGoals.map((goal, index) => (
-            <div key={index} className="p-4 border border-slate-200 rounded-lg">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-semibold text-slate-800">{goal.title}</h4>
-                <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getPriorityColor(goal.priority)}`}>
-                  {goal.priority}
-                </span>
+          {goals.map((goal: any) => {
+            const percent = Math.min(100, (Number(goal.current || 0) / Number(goal.target || 1)) * 100);
+            return (
+              <div key={goal.id} className={`p-4 border ${goal.completed ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200'} rounded-lg`}>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold text-slate-800">{goal.title}</h4>
+                  <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getPriorityColor(goal.priority)}`}>
+                    {goal.priority}
+                  </span>
+                </div>
+
+                <div className="mb-3">
+                  <div className="flex items-center justify-between text-sm text-slate-600 mb-1">
+                    <span>Progress</span>
+                    <span>{percent.toFixed(1)}%</span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-2">
+                    <div 
+                      className="bg-indigo-500 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${percent}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="text-sm text-slate-600 mb-3">
+                  <div className="flex justify-between">
+                    <span>{formatCurrency(Number(goal.current || 0))}</span>
+                    <span>{formatCurrency(Number(goal.target || 0))}</span>
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    Deadline: {new Date(goal.deadline).toLocaleDateString()}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button disabled={goal.completed} onClick={() => openAddMoneyModal(goal.id)} className="px-2 py-1 text-sm bg-slate-100 rounded-md">Add Money</button>
+                  <button disabled={goal.completed || Number(goal.current || 0) < Number(goal.target || 0)} onClick={() => markGoalComplete(goal.id)} className="px-2 py-1 text-sm bg-emerald-100 rounded-md">Complete</button>
+                </div>
               </div>
-              
-              <div className="mb-3">
-                <div className="flex items-center justify-between text-sm text-slate-600 mb-1">
-                  <span>Progress</span>
-                  <span>{((goal.current / goal.target) * 100).toFixed(1)}%</span>
-                </div>
-                <div className="w-full bg-slate-200 rounded-full h-2">
-                  <div 
-                    className="bg-indigo-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${(goal.current / goal.target) * 100}%` }}
-                  />
-                </div>
+            );
+          })}
+        </div>
+
+        {/* Add Goal Modal */}
+        {showAddGoal && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <h4 className="font-semibold mb-4">Create Goal</h4>
+              <div className="space-y-3">
+                <input value={newGoalTitle} onChange={e => setNewGoalTitle(e.target.value)} placeholder="Title" className="w-full p-2 border rounded" />
+                <input value={String(newGoalTarget)} onChange={e => setNewGoalTarget(Number(e.target.value) || '')} placeholder="Target amount" type="number" className="w-full p-2 border rounded" />
+                <input value={newGoalDeadline} onChange={e => setNewGoalDeadline(e.target.value)} placeholder="Deadline" type="date" className="w-full p-2 border rounded" />
+                <select value={newGoalPriority} onChange={e => setNewGoalPriority(e.target.value as any)} className="w-full p-2 border rounded">
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
               </div>
-              
-              <div className="text-sm text-slate-600">
-                <div className="flex justify-between">
-                  <span>{formatCurrency(goal.current)}</span>
-                  <span>{formatCurrency(goal.target)}</span>
-                </div>
-                <div className="text-xs text-slate-500 mt-1">
-                  Deadline: {new Date(goal.deadline).toLocaleDateString()}
-                </div>
+              <div className="flex items-center justify-end gap-2 mt-4">
+                <button onClick={() => setShowAddGoal(false)} className="px-3 py-1">Cancel</button>
+                <button onClick={submitNewGoal} className="px-3 py-1 bg-indigo-600 text-white rounded">Create</button>
               </div>
             </div>
-          ))}
-        </div>
+          </div>
+        )}
+
+        {/* Add Money Modal */}
+        {showAddMoney && moneyGoalId && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <h4 className="font-semibold mb-4">Add Money to Goal</h4>
+              <div className="space-y-3">
+                <select value={moneyCardId || ''} onChange={e => setMoneyCardId(e.target.value || null)} className="w-full p-2 border rounded">
+                  {cards.map((c: any) => (<option key={c._id} value={c._id}>{c.accountName} — {c.currency} — {formatCurrency(c.availableBalance)}</option>))}
+                </select>
+                <input value={String(moneyAmount)} onChange={e => setMoneyAmount(Number(e.target.value) || '')} placeholder="Amount" type="number" className="w-full p-2 border rounded" />
+              </div>
+              <div className="flex items-center justify-end gap-2 mt-4">
+                <button onClick={() => setShowAddMoney(false)} className="px-3 py-1">Cancel</button>
+                <button onClick={submitAddMoney} className="px-3 py-1 bg-indigo-600 text-white rounded">Charge Card & Add</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

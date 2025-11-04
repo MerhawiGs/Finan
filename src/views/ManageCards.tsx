@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Trash2, Edit2, Plus, X } from 'lucide-react';
+import { Trash2, Edit2, Plus, X, Repeat } from 'lucide-react';
 
 type Card = {
   _id: string;
@@ -12,8 +12,9 @@ type Card = {
   targetBalance: number;
 };
 
-// const API = 'http://localhost:3000';
-const API = import.meta.env.VITE_API_URL ?? 'https://finan-back-qmph.onrender.com';
+const API = 'http://localhost:3000';
+// const API = import.meta.env.VITE_API_URL ?? 'https://finan-back-qmph.onrender.com';
+// const API = import.meta.env.VITE_API_URL;
 
 export default function ManageCards() {
   const [cards, setCards] = useState<Card[]>([]);
@@ -22,6 +23,12 @@ export default function ManageCards() {
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Card | null>(null);
+
+  // transfer modal state
+  const [showTransfer, setShowTransfer] = useState(false);
+  const [transferLoading, setTransferLoading] = useState(false);
+  const [transferError, setTransferError] = useState<string | null>(null);
+  const [transferForm, setTransferForm] = useState({ fromCardId: '', toCardId: '', amount: 0, remark: '' });
 
   const [form, setForm] = useState({
     accountName: '',
@@ -93,9 +100,12 @@ export default function ManageCards() {
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-semibold">Manage Accounts</h2>
         <div className="flex items-center gap-3">
-          <button onClick={openCreate} className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg shadow hover:bg-indigo-700 transition">
-            <Plus className="w-4 h-4" /> Add Account
-          </button>
+            <button onClick={() => setShowTransfer(true)} className="inline-flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow hover:bg-emerald-700 transition">
+              <Repeat className="w-4 h-4" /> Transfer
+            </button>
+            <button onClick={openCreate} className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg shadow hover:bg-indigo-700 transition">
+              <Plus className="w-4 h-4" /> Add Account
+            </button>
         </div>
       </div>
 
@@ -171,6 +181,75 @@ export default function ManageCards() {
             <div className="mt-6 flex justify-end gap-3">
               <button onClick={() => setShowForm(false)} className="px-4 py-2 rounded border">Cancel</button>
               <button onClick={save} className="px-4 py-2 bg-indigo-600 text-white rounded">Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Modal */}
+      {showTransfer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowTransfer(false)} />
+          <div className="relative bg-white rounded-lg shadow-lg w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Transfer Money</h3>
+              <button onClick={() => setShowTransfer(false)} className="p-2"><X className="w-5 h-5" /></button>
+            </div>
+
+            {transferError && <div className="mb-3 text-sm text-rose-600">{transferError}</div>}
+
+            <div className="grid grid-cols-1 gap-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">From</label>
+                <select value={transferForm.fromCardId} onChange={e => setTransferForm({ ...transferForm, fromCardId: e.target.value })} className="w-full p-2 border rounded">
+                  <option value="">Select source account</option>
+                  {cards.map(c => <option key={c._id} value={c._id}>{c.accountName} — {c.availableBalance.toLocaleString()}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">To</label>
+                <select value={transferForm.toCardId} onChange={e => setTransferForm({ ...transferForm, toCardId: e.target.value })} className="w-full p-2 border rounded">
+                  <option value="">Select destination account</option>
+                  {cards.map(c => <option key={c._id} value={c._id}>{c.accountName} — {c.availableBalance.toLocaleString()}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Amount</label>
+                <input type="number" value={String(transferForm.amount)} onChange={e => setTransferForm({ ...transferForm, amount: Number(e.target.value) })} className="w-full p-2 border rounded" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Note (optional)</label>
+                <input value={transferForm.remark} onChange={e => setTransferForm({ ...transferForm, remark: e.target.value })} className="w-full p-2 border rounded" />
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button onClick={() => setShowTransfer(false)} className="px-4 py-2 rounded border">Cancel</button>
+              <button onClick={async () => {
+                setTransferError(null);
+                if (!transferForm.fromCardId || !transferForm.toCardId) { setTransferError('Please select source and destination'); return; }
+                if (transferForm.fromCardId === transferForm.toCardId) { setTransferError('Source and destination must be different'); return; }
+                if (!transferForm.amount || transferForm.amount <= 0) { setTransferError('Enter a valid amount'); return; }
+                try {
+                  setTransferLoading(true);
+                  const res = await fetch(`${API}/cards/transfer`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fromCardId: transferForm.fromCardId, toCardId: transferForm.toCardId, amount: transferForm.amount, remark: transferForm.remark }) });
+                  const j = await res.json();
+                  if (!res.ok) throw new Error(j.message || 'Transfer failed');
+                  // refresh cards
+                  fetchCards();
+                  // notify other components to refresh (RecentTransactions, Cards)
+                  window.dispatchEvent(new CustomEvent('transaction:created'));
+                  setShowTransfer(false);
+                  setTransferForm({ fromCardId: '', toCardId: '', amount: 0, remark: '' });
+                } catch (err: any) {
+                  setTransferError(err.message || 'Transfer failed');
+                } finally { setTransferLoading(false); }
+              }} className="px-4 py-2 bg-emerald-600 text-white rounded disabled:opacity-50" disabled={transferLoading}>
+                {transferLoading ? 'Transferring…' : 'Transfer'}
+              </button>
             </div>
           </div>
         </div>

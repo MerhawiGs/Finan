@@ -7,7 +7,7 @@ import {
 import { useMemo, useState, useEffect } from 'react';
 import { useCardContext } from '../contexts/CardContext';
 
-type TransactionType = 'income' | 'expense';
+type TransactionType = 'income' | 'expense' | 'reward';
 
 interface Transaction {
   id: string;
@@ -158,7 +158,11 @@ function getCategoryIcon(category: string) {
     case 'business':
       return <Briefcase className={`${iconClass} text-slate-600`} />;
     case 'gifts':
-      return <Gift className={`${iconClass} text-rose-600`} />;
+        return <Gift className={`${iconClass} text-rose-600`} />;
+      case 'reward':
+      case 'rewards':
+      case 'reward(s)':
+        return <Gift className={`${iconClass} text-amber-600`} />;
     default:
       return <Clock className={`${iconClass} text-gray-600`} />;
   }
@@ -179,12 +183,17 @@ function getCategoryColor(category: string) {
     case 'technology': return 'bg-cyan-50 border-cyan-200';
     case 'business': return 'bg-slate-50 border-slate-200';
     case 'gifts': return 'bg-rose-50 border-rose-200';
+    case 'reward':
+    case 'rewards':
+    case 'reward(s)':
+      return 'bg-amber-50 border-amber-200';
     default: return 'bg-gray-50 border-gray-200';
   }
 }
 
-// const API = 'http://localhost:3000';
-const API = import.meta.env.VITE_API_URL ?? 'https://finan-back-qmph.onrender.com';
+const API = 'http://localhost:3000';
+// const API = import.meta.env.VITE_API_URL ?? 'https://finan-back-qmph.onrender.com';
+// const API = import.meta.env.VITE_API_URL;
 
 export default function RecentTransactions({ transactions, onViewAll }: RecentTransactionsProps) {
   const { selectedCardId } = useCardContext();
@@ -246,7 +255,7 @@ export default function RecentTransactions({ transactions, onViewAll }: RecentTr
           category: t.category || 'Other',
           date: t.createdAt || t.date || new Date().toISOString(),
           amount: typeof t.amount === 'number' ? t.amount : Number(t.amount || 0),
-          type: t.type === 'income' ? 'income' : 'expense',
+          type: t.type === 'income' ? 'income' : t.type === 'reward' ? 'reward' : 'expense',
           description: t.remark || t.description || '',
           status: t.status || 'completed'
         }));
@@ -394,18 +403,20 @@ export default function RecentTransactions({ transactions, onViewAll }: RecentTr
 
               <div className="flex items-center gap-2 sm:gap-4">
                 <div className="text-right">
-                  <div className={`text-sm font-bold ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-800'}`}>
+                  <div className={`text-sm font-bold ${t.type === 'income' ? 'text-emerald-600' : t.type === 'reward' ? 'text-amber-600' : 'text-slate-800'}`}>
                     {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
                   </div>
                   <div className="hidden sm:block text-xs text-slate-500">
-                    {t.type === 'income' ? 'Income' : 'Expense'}
+                    {t.type === 'income' ? 'Income' : t.type === 'reward' ? 'Reward' : 'Expense'}
                   </div>
                 </div>
                 
                 <div className={`hidden sm:flex items-center justify-center w-8 h-8 rounded-full ${
                   t.type === 'income' 
                     ? 'bg-emerald-100 text-emerald-600' 
-                    : 'bg-rose-100 text-rose-600'
+                    : t.type === 'reward' 
+                      ? 'bg-amber-100 text-amber-600' 
+                      : 'bg-rose-100 text-rose-600'
                 }`}>
                   {t.type === 'income' ? (
                     <ArrowUpRight className="w-4 h-4" />

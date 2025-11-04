@@ -11,7 +11,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeView, setView, onAddClick }
     // Icons were updated in the previous step: History (Clock3) and Reports (BarChart3)
     const navItems = [
         { name: 'Home', icon: Home, view: 'dashboard' },
-        { name: 'Budget', icon: Clock3, view: 'history' },
+        { name: 'Planner', icon: Clock3, view: 'planner' },
         { name: 'Reports', icon: BarChart3, view: 'reports' },
         { name: 'Settings', icon: Settings, view: 'settings' },
     ];
