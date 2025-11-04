@@ -4,8 +4,7 @@ import { X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CirclePoundSterling } from 'lucide-react';
 
-const API = 'http://localhost:3000';
-// const API = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+const API = (import.meta as any).env.VITE_API_URL || 'http://localhost:3000';
 
 type Task = {
   id: string;
@@ -55,10 +54,25 @@ export default function Planner() {
       if (raw) setTasks(JSON.parse(raw));
     } catch (e) { console.warn(e); }
 
-    try {
-      const h = localStorage.getItem(HISTORY_KEY);
-      if (h) setHistory(JSON.parse(h));
-    } catch (e) { console.warn(e); }
+    // load history from backend (fallback to localStorage)
+    (async () => {
+      try {
+        const res = await fetch(`${API}/planner/history`);
+        if (!res.ok) throw new Error('Failed to load history');
+        const arr = await res.json();
+        const map: Record<string, Record<string, boolean>> = {};
+        for (const item of arr) {
+          map[item.dateISO] = map[item.dateISO] || {};
+          map[item.dateISO][item.taskId] = !!item.completed;
+        }
+        setHistory(map);
+      } catch (err) {
+        try {
+          const h = localStorage.getItem(HISTORY_KEY);
+          if (h) setHistory(JSON.parse(h));
+        } catch (e) { console.warn(e); }
+      }
+    })();
 
     try {
       const c = localStorage.getItem(CLAIMS_KEY);
@@ -66,9 +80,7 @@ export default function Planner() {
     } catch (e) { console.warn(e); }
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-  }, [history]);
+  // when history changes, persist to backend is handled in toggleTask; keep local cache as fallback
 
   useEffect(() => {
     localStorage.setItem(CLAIMS_KEY, JSON.stringify(claims));
@@ -82,12 +94,33 @@ export default function Planner() {
   }
 
   function toggleTask(dateISO: string, taskId: string) {
+    // optimistic update + persist to backend
+    const currently = !!(history[dateISO] && history[dateISO][taskId]);
+    const next = !currently;
     setHistory(prev => {
       const copy = { ...prev };
       copy[dateISO] = { ...(copy[dateISO] || {}) };
-      copy[dateISO][taskId] = !copy[dateISO][taskId];
+      copy[dateISO][taskId] = next;
       return copy;
     });
+
+    (async () => {
+      try {
+        await fetch(`${API}/planner/history`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dateISO, taskId, completed: next })
+        });
+      } catch (err) {
+        console.warn('Failed to persist task completion', err);
+        // rollback on failure
+        setHistory(prev => {
+          const copy = { ...prev };
+          copy[dateISO] = { ...(copy[dateISO] || {}) };
+          copy[dateISO][taskId] = currently;
+          return copy;
+        });
+      }
+    })();
   }
 
   
@@ -181,7 +214,7 @@ export default function Planner() {
           <div className="text-sm text-slate-500">No tasks yet. Add tasks in the Tasks view.</div>
         ) : (
           <div className="space-y-3">
-            {tasks.map((t, idx) => (
+            {tasks.map((t) => (
               <div key={t.id} className="flex items-center justify-between p-4 rounded-xl shadow-lg bg-linear-to-br from-white to-slate-50">
                 <div className="flex items-center gap-4">
                   {/* <div className="w-14 h-14 rounded-xl bg-linear-to-br from-indigo-500 to-emerald-400 flex items-center justify-center text-white font-bold text-lg">{String(idx+1)}</div> */}

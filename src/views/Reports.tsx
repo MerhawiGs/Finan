@@ -19,11 +19,7 @@ const mockBudgets = [
   { category: 'Education', budget: 2000, spent: 1200, color: 'bg-teal-500' },
 ];
 
-const mockGoals = [
-  { id: 'g1', title: 'Emergency Fund', target: 50000, current: 25000, deadline: '2025-12-31', priority: 'high', completed: false },
-  { id: 'g2', title: 'Vacation Fund', target: 15000, current: 8000, deadline: '2025-06-30', priority: 'medium', completed: false },
-  { id: 'g3', title: 'New Laptop', target: 30000, current: 12000, deadline: '2025-03-31', priority: 'low', completed: false },
-];
+// goals will be loaded from the backend /goals
 
 const API_BASE = (import.meta as any).env.VITE_API_URL || 'http://localhost:3000';
 
@@ -62,14 +58,8 @@ export default function Reports() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [cards, setCards] = useState<any[]>([]);
 
-  // goals persisted in localStorage (simple client-side persistence)
-  const [goals, setGoals] = useState<any[]>(() => {
-    try {
-      const raw = localStorage.getItem('finan_goals_v1');
-      if (raw) return JSON.parse(raw);
-    } catch (e) {}
-    return mockGoals;
-  });
+  // goals persisted on the backend
+  const [goals, setGoals] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,6 +102,14 @@ export default function Reports() {
       const cardsRes = await fetch(`${API_BASE}/cards`);
       const cardsJson = await cardsRes.json();
       setCards(Array.isArray(cardsJson) ? cardsJson : []);
+      // load goals from backend
+      try {
+        const goalsRes = await fetch(`${API_BASE}/goals`);
+        const goalsJson = await goalsRes.json();
+        setGoals(Array.isArray(goalsJson) ? goalsJson : []);
+      } catch (gErr) {
+        console.warn('Failed to load goals', gErr);
+      }
     } catch (err: any) {
       console.warn(err);
       setError(err?.message || 'Failed to load data');
@@ -119,11 +117,6 @@ export default function Reports() {
       setLoading(false);
     }
   }
-
-  // persist goals
-  useEffect(() => {
-    try { localStorage.setItem('finan_goals_v1', JSON.stringify(goals)); } catch (e) {}
-  }, [goals]);
 
   // Calculate comprehensive analytics
   const analytics = useMemo(() => {
@@ -273,13 +266,22 @@ export default function Reports() {
       });
       if (!res.ok) throw new Error('Failed to charge card');
       await res.json();
-
-      // update goal local state (use id match). If goal is fulfilled mark completed.
-      setGoals((prev: any[]) => prev.map((g: any) => {
-        if (g.id !== moneyGoalId) return g;
-        const newCurrent = (Number(g.current) || 0) + amount;
-        return { ...g, current: Math.min(newCurrent, Number(g.target || 0)), completed: newCurrent >= Number(g.target || 0) };
-      }));
+      // update goal on backend (increment current) and refresh local goals
+      try {
+        const gm = await fetch(`${API_BASE}/goals/${moneyGoalId}/add-money`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount })
+        });
+        if (gm.ok) {
+          const updated = await gm.json();
+          setGoals((prev: any[]) => prev.map((g: any) => g.id === updated.id ? updated : g));
+        } else {
+          console.warn('Failed to update goal after charging card');
+        }
+      } catch (gerr) {
+        console.warn('Failed to update goal', gerr);
+      }
       // notify other parts of the app
       window.dispatchEvent(new CustomEvent('transaction:created'));
       setShowAddMoney(false);
@@ -291,22 +293,43 @@ export default function Reports() {
 
   function submitNewGoal() {
     if (!newGoalTitle || !newGoalTarget) return;
-    const g = {
-      id: `g_${Date.now()}`,
-      title: newGoalTitle,
-      target: Number(newGoalTarget),
-      current: 0,
-      deadline: newGoalDeadline || new Date().toISOString(),
-      priority: newGoalPriority,
-      completed: false
-    };
-  setGoals((prev: any[]) => [g, ...prev]);
-    setShowAddGoal(false);
-    setNewGoalTitle(''); setNewGoalTarget(''); setNewGoalDeadline(''); setNewGoalPriority('medium');
+    (async () => {
+      try {
+        setLoading(true);
+        const res = await fetch(`${API_BASE}/goals`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: newGoalTitle, target: Number(newGoalTarget), deadline: newGoalDeadline, priority: newGoalPriority })
+        });
+        if (!res.ok) throw new Error('Failed to create goal');
+        const created = await res.json();
+        setGoals((prev: any[]) => [created, ...prev]);
+        setShowAddGoal(false);
+        setNewGoalTitle(''); setNewGoalTarget(''); setNewGoalDeadline(''); setNewGoalPriority('medium');
+      } catch (err: any) {
+        console.warn(err);
+        setError(err?.message || 'Failed to create goal');
+      } finally { setLoading(false); }
+    })();
   }
 
   function markGoalComplete(id: string) {
-  setGoals((prev: any[]) => prev.map((g: any) => g.id === id ? { ...g, completed: true, current: g.target } : g));
+    (async () => {
+      try {
+        setLoading(true);
+        const res = await fetch(`${API_BASE}/goals/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ completed: true })
+        });
+        if (!res.ok) throw new Error('Failed to mark complete');
+        const updated = await res.json();
+        setGoals((prev: any[]) => prev.map((g: any) => g.id === updated.id ? updated : g));
+      } catch (err: any) {
+        console.warn(err);
+        setError(err?.message || 'Failed to update goal');
+      } finally { setLoading(false); }
+    })();
   }
 
   // sort goals: pending first by priority (high, medium, low), completed last
