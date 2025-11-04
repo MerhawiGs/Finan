@@ -118,10 +118,10 @@ export default function TaskManager() {
           {tasks.map((t, idx) => (
             <div key={t.id} className="flex items-center justify-between bg-linear-to-r from-slate-50 to-white rounded-lg p-3 shadow-md border">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-linear-to-br from-indigo-500 to-emerald-400 flex items-center justify-center text-white font-bold">{String(idx+1)}</div>
+                <div className="w-12 h-12 rounded-xl bg-linear-to-br from-orange-500 to-orange-300 flex items-center justify-center text-white font-bold">{String(idx+1)}</div>
                 <div className="flex flex-col">
                   <div className={`font-semibold text-slate-800`}>{t.name}</div>
-                  {t.incentive && <div className="text-xs text-slate-500 mt-1"><span className="px-2 py-0.5 bg-amber-50 border border-amber-100 rounded">💰 {t.incentive}</span></div>}
+                  {t.incentive && <div className="text-xs text-slate-500 mt-1"><span className="px-2 py-0.5 bg-amber-50 border border-amber-100 rounded">+ {t.incentive}</span></div>}
                 </div>
               </div>
               <div className="flex items-center gap-2">

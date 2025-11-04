@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { useCardContext } from '../contexts/CardContext';
 
-const API = 'http://localhost:3000';
+// const API = 'http://localhost:3000';
 // const API = process.env.VITE_API_URL ?? 'https://finan-back-qmph.onrender.com';
-// const API = import.meta.env.VITE_API_URL ?? 'https://finan-back-qmph.onrender.com';
+const API = import.meta.env.VITE_API_URL ?? 'https://finan-back-qmph.onrender.com';
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -50,6 +50,18 @@ export default function AddTransactionModal({ open, onClose }: Props) {
       alert('Enter a valid amount');
       return;
     }
+    // prevent creating an expense if card has no balance or insufficient funds
+    if (type === 'expense') {
+      const bal = Number(card?.availableBalance ?? 0);
+      if (bal <= 0) {
+        alert('Selected card has no available balance to create an expense');
+        return;
+      }
+      if (Number(amount) > bal) {
+        alert('Amount exceeds available card balance');
+        return;
+      }
+    }
     const txn = {
       type,
       amount: Number(amount),
@@ -83,6 +95,8 @@ export default function AddTransactionModal({ open, onClose }: Props) {
       }
     })();
   };
+
+  const amountNum = typeof amount === 'number' ? amount : 0;
 
   if (!open) return null;
 
@@ -146,6 +160,13 @@ export default function AddTransactionModal({ open, onClose }: Props) {
             <div>
               <label className="block text-sm font-medium mb-1">Amount</label>
               <input type="number" value={amount} onChange={e => setAmount(e.target.value === '' ? '' : Number(e.target.value))} className="w-full p-2 border rounded" />
+              {type === 'expense' && (
+                <div className="text-xs mt-1">
+                  <span className="text-slate-500">Available: {card ? card.availableBalance.toLocaleString('en-US', { style: 'currency', currency: card.currency }) : '-'}</span>
+                  {card && card.availableBalance <= 0 && <div className="text-xs text-red-600">This card has no available balance — cannot create an expense.</div>}
+                  {card && amountNum > card.availableBalance && <div className="text-xs text-red-600">Entered amount exceeds available balance.</div>}
+                </div>
+              )}
             </div>
 
             <div>
@@ -155,7 +176,13 @@ export default function AddTransactionModal({ open, onClose }: Props) {
 
             <div className="flex justify-end gap-3">
               <button onClick={onClose} className="px-4 py-2 rounded border">Cancel</button>
-              <button onClick={save} className="px-4 py-2 bg-indigo-600 text-white rounded">Save</button>
+              <button
+                onClick={save}
+                disabled={loading || amountNum <= 0 || (type === 'expense' && (!card || Number(card.availableBalance) <= 0 || amountNum > Number(card.availableBalance)))}
+                className={`px-4 py-2 text-white rounded ${loading ? 'bg-slate-300' : 'bg-indigo-600'} ${(type === 'expense' && (!card || Number(card.availableBalance) <= 0 || amountNum > Number(card.availableBalance))) || amountNum <= 0 ? 'opacity-60 cursor-not-allowed' : ''}`}
+              >
+                {loading ? 'Saving…' : 'Save'}
+              </button>
             </div>
           </div>
         )}

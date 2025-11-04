@@ -87,6 +87,7 @@ export default function Reports() {
   const [moneyGoalId, setMoneyGoalId] = useState<string | null>(null);
   const [moneyAmount, setMoneyAmount] = useState<number | ''>('');
   const [moneyCardId, setMoneyCardId] = useState<string | null>(null);
+  const [moneyError, setMoneyError] = useState<string | null>(null);
 
   useEffect(() => {
     const onTxCreated = () => fetchData();
@@ -243,12 +244,26 @@ export default function Reports() {
     setMoneyGoalId(goalId);
     setMoneyAmount('');
     setMoneyCardId(cards.length ? cards[0]._id : null);
+    setMoneyError(null);
     setShowAddMoney(true);
   }
 
   async function submitAddMoney() {
     if (!moneyGoalId || !moneyCardId || !moneyAmount || Number(moneyAmount) <= 0) return;
     const amount = Number(moneyAmount);
+    // validate against remaining goal and selected card balance
+    const goal = goals.find((g: any) => g.id === moneyGoalId);
+    const card = cards.find((c: any) => c._id === moneyCardId);
+    const remaining = Math.max(0, Number(goal?.target || 0) - Number(goal?.current || 0));
+    const cardBalance = Number(card?.availableBalance ?? 0);
+    if (amount > remaining) {
+      setMoneyError(`Amount exceeds remaining goal amount (${formatCurrency(remaining)})`);
+      return;
+    }
+    if (amount > cardBalance) {
+      setMoneyError(`Insufficient card balance (${formatCurrency(cardBalance)})`);
+      return;
+    }
     try {
       setLoading(true);
       const res = await fetch(`${API_BASE}/cards/${moneyCardId}/transaction`, {
@@ -259,8 +274,12 @@ export default function Reports() {
       if (!res.ok) throw new Error('Failed to charge card');
       await res.json();
 
-      // update goal local state (use id match)
-  setGoals((prev: any[]) => prev.map((g: any) => g.id === moneyGoalId ? { ...g, current: (Number(g.current) || 0) + amount } : g));
+      // update goal local state (use id match). If goal is fulfilled mark completed.
+      setGoals((prev: any[]) => prev.map((g: any) => {
+        if (g.id !== moneyGoalId) return g;
+        const newCurrent = (Number(g.current) || 0) + amount;
+        return { ...g, current: Math.min(newCurrent, Number(g.target || 0)), completed: newCurrent >= Number(g.target || 0) };
+      }));
       // notify other parts of the app
       window.dispatchEvent(new CustomEvent('transaction:created'));
       setShowAddMoney(false);
@@ -289,6 +308,19 @@ export default function Reports() {
   function markGoalComplete(id: string) {
   setGoals((prev: any[]) => prev.map((g: any) => g.id === id ? { ...g, completed: true, current: g.target } : g));
   }
+
+  // sort goals: pending first by priority (high, medium, low), completed last
+  const sortedGoals = useMemo(() => {
+    const priorityValue = (p: string) => (p === 'high' ? 0 : p === 'medium' ? 1 : 2);
+    const pending = goals.filter(g => !g.completed).sort((a: any, b: any) => {
+      const pa = priorityValue(a.priority || 'medium');
+      const pb = priorityValue(b.priority || 'medium');
+      if (pa !== pb) return pa - pb;
+      return a.title.localeCompare(b.title);
+    });
+    const completed = goals.filter(g => g.completed).sort((a: any, b: any) => a.title.localeCompare(b.title));
+    return [...pending, ...completed];
+  }, [goals]);
 
   return (
     <div className="w-full max-w-6xl mx-auto p-4 space-y-6">
@@ -506,7 +538,7 @@ export default function Reports() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {goals.map((goal: any) => {
+          {sortedGoals.map((goal: any) => {
             const percent = Math.min(100, (Number(goal.current || 0) / Number(goal.target || 1)) * 100);
             return (
               <div key={goal.id} className={`p-4 border ${goal.completed ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200'} rounded-lg`}>
@@ -581,11 +613,33 @@ export default function Reports() {
                 <select value={moneyCardId || ''} onChange={e => setMoneyCardId(e.target.value || null)} className="w-full p-2 border rounded">
                   {cards.map((c: any) => (<option key={c._id} value={c._id}>{c.accountName} — {c.currency} — {formatCurrency(c.availableBalance)}</option>))}
                 </select>
-                <input value={String(moneyAmount)} onChange={e => setMoneyAmount(Number(e.target.value) || '')} placeholder="Amount" type="number" className="w-full p-2 border rounded" />
+                <input value={String(moneyAmount)} onChange={e => { setMoneyAmount(Number(e.target.value) || ''); setMoneyError(null); }} placeholder="Amount" type="number" className="w-full p-2 border rounded" />
+                {moneyError && <div className="text-xs text-red-600 mt-1">{moneyError}</div>}
+                <div className="text-xs text-slate-500 mt-1">
+                  {(() => {
+                    const goal = goals.find((g: any) => g.id === moneyGoalId);
+                    const remaining = Math.max(0, Number(goal?.target || 0) - Number(goal?.current || 0));
+                    const card = cards.find((c: any) => c._id === moneyCardId);
+                    const cardBalance = Number(card?.availableBalance ?? 0);
+                    return `Remaining goal: ${formatCurrency(remaining)} • Card balance: ${formatCurrency(cardBalance)}`;
+                  })()}
+                </div>
               </div>
               <div className="flex items-center justify-end gap-2 mt-4">
                 <button onClick={() => setShowAddMoney(false)} className="px-3 py-1">Cancel</button>
-                <button onClick={submitAddMoney} className="px-3 py-1 bg-indigo-600 text-white rounded">Charge Card & Add</button>
+                {(() => {
+                  const amountNum = Number(moneyAmount) || 0;
+                  const goal = goals.find((g: any) => g.id === moneyGoalId);
+                  const remaining = Math.max(0, Number(goal?.target || 0) - Number(goal?.current || 0));
+                  const card = cards.find((c: any) => c._id === moneyCardId);
+                  const cardBalance = Number(card?.availableBalance ?? 0);
+                  const disabled = amountNum <= 0 || amountNum > remaining || amountNum > cardBalance || !moneyCardId;
+                  return (
+                    <button disabled={disabled} onClick={submitAddMoney} className={`px-3 py-1 text-white rounded ${disabled ? 'bg-slate-300' : 'bg-indigo-600'}`}>
+                      Charge Card & Add
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           </div>

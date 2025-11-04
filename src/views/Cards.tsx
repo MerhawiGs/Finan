@@ -47,8 +47,8 @@ const getCardGradientInfo = (cardType: string) => {
 };
 
 // API base
-const API = 'http://localhost:3000';
-// const API = import.meta.env.VITE_API_URL ?? 'https://finan-back-qmph.onrender.com';
+// const API = 'http://localhost:3000';
+const API = import.meta.env.VITE_API_URL ?? 'https://finan-back-qmph.onrender.com';
 // const API = import.meta.env.VITE_API_URL;
 
 // Mock Data Structure (Embedded for demonstration)
