@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import TopNav from './views/TopNav';
 import HomeBody from './views/HomeBody';
-import History from './views/History';
 import Planner from './views/Planner';
 import TaskManager from './views/TaskManager';
 import Reports from './views/Reports';

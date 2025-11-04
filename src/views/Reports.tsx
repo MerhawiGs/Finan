@@ -562,7 +562,9 @@ export default function Reports() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {sortedGoals.map((goal: any) => {
-            const percent = Math.min(100, (Number(goal.current || 0) / Number(goal.target || 1)) * 100);
+            const targetNum = Number(goal.target || 0) || 0;
+            const currentNum = Number(goal.current || 0) || 0;
+            const percent = targetNum > 0 ? Math.min(100, (currentNum / targetNum) * 100) : 0;
             return (
               <div key={goal.id} className={`p-4 border ${goal.completed ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200'} rounded-lg`}>
                 <div className="flex items-center justify-between mb-3">
@@ -577,7 +579,7 @@ export default function Reports() {
                     <span>Progress</span>
                     <span>{percent.toFixed(1)}%</span>
                   </div>
-                  <div className="w-full bg-slate-200 rounded-full h-2">
+                  <div className="w-full bg-slate-200 rounded-full h-2" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percent)} title={`${formatCurrency(currentNum)} / ${formatCurrency(targetNum)} — ${percent.toFixed(1)}%`}>
                     <div 
                       className="bg-indigo-500 h-2 rounded-full transition-all duration-300"
                       style={{ width: `${percent}%` }}
