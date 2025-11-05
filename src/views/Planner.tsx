@@ -4,8 +4,7 @@ import { X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CirclePoundSterling } from 'lucide-react';
 
-const API = import.meta.env.VITE_API_URL; 
-// const API = import.meta.env.VITE_API_URL ?? 'https://finan-back-qmph.onrender.com';
+const API = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
 
 type Task = {
@@ -51,10 +50,20 @@ export default function Planner() {
   const [claimError, setClaimError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(TASK_KEY);
-      if (raw) setTasks(JSON.parse(raw));
-    } catch (e) { console.warn(e); }
+    // Load tasks from server first, fallback to localStorage
+    (async () => {
+      try {
+        const res = await fetch(`${API}/tasks`);
+        if (!res.ok) throw new Error('Failed to load tasks from server');
+        const arr = await res.json();
+        setTasks(Array.isArray(arr) ? arr.map((t: any) => ({ id: t._id || t.id, name: t.name, incentive: t.incentive })) : []);
+      } catch (err) {
+        try {
+          const raw = localStorage.getItem(TASK_KEY);
+          if (raw) setTasks(JSON.parse(raw));
+        } catch (e) { console.warn('Failed to load tasks from localStorage', e); }
+      }
+    })();
 
     // load history from backend (fallback to localStorage)
     (async () => {

@@ -10,6 +10,7 @@ type Task = {
 
 const STORAGE_KEY = 'finan_tasks_v1';
 
+const API_BASE = (import.meta as any).env.VITE_API_URL ?? 'http://localhost:3000';
 function uid() {
   return Math.random().toString(36).slice(2, 9);
 }
@@ -19,18 +20,34 @@ export default function TaskManager() {
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
+  const [offline, setOffline] = useState(false);
 
   const [form, setForm] = useState({ name: '', incentive: '' });
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setTasks(JSON.parse(raw));
-    } catch (e) {
-      console.warn('Failed to load tasks', e);
-    } finally {
-      setLoading(false);
-    }
+    // Try to load from server first, fall back to localStorage
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/tasks`);
+        if (!res.ok) throw new Error('Failed to fetch tasks');
+        const json = await res.json();
+        // normalize to frontend Task shape
+            const mapped: Task[] = Array.isArray(json) ? json.map((t: any) => ({ id: t._id || t.id || String(t._id), name: t.name, incentive: t.incentive })) : [];
+        setTasks(mapped);
+        setOffline(false);
+      } catch (e) {
+        console.warn('Failed to load tasks from server, falling back to localStorage', e);
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) setTasks(JSON.parse(raw));
+        } catch (le) {
+          console.warn('Failed to load tasks from localStorage', le);
+        }
+        setOffline(true);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -38,6 +55,35 @@ export default function TaskManager() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
     } catch (e) {
       console.warn('Failed to save tasks', e);
+    }
+    // If online, also persist to server
+    if (!offline) {
+      (async () => {
+        try {
+          // send bulk upsert: create missing tasks and update existing order
+          // We'll iterate tasks and create/update as needed
+          for (let i = 0; i < tasks.length; i++) {
+            const t = tasks[i];
+            // if id looks like a backend id (24 hex) we PATCH, otherwise POST
+            const isServerId = /^\w{24}$/.test(t.id);
+            if (isServerId) {
+              await fetch(`${API_BASE}/tasks/${t.id}`,
+                { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: t.name, incentive: t.incentive, order: i }) }
+              ).catch(() => {});
+            } else {
+              const created = await fetch(`${API_BASE}/tasks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: t.name, incentive: t.incentive, order: i }) });
+              if (created.ok) {
+                const body = await created.json();
+                // replace local id with server id
+                setTasks(prev => prev.map(pt => pt.id === t.id ? { ...pt, id: body._id || body.id } : pt));
+              }
+            }
+          }
+        } catch (err) {
+          // don't block UI on save errors
+          console.warn('Failed to persist tasks to server', err);
+        }
+      })();
     }
   }, [tasks]);
 
@@ -56,10 +102,33 @@ export default function TaskManager() {
   function saveTask() {
     if (!form.name.trim()) return;
     if (editing) {
+      // optimistic update
       setTasks(prev => prev.map(t => t.id === editing.id ? { ...t, name: form.name.trim(), incentive: form.incentive.trim() || undefined } : t));
+      // persist
+      (async () => {
+        try {
+          await fetch(`${API_BASE}/tasks/${editing.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name.trim(), incentive: form.incentive.trim() || undefined }) });
+        } catch (err) {
+          console.warn('Failed to update task on server', err);
+          setOffline(true);
+        }
+      })();
     } else {
       const t: Task = { id: uid(), name: form.name.trim(), incentive: form.incentive.trim() || undefined };
       setTasks(prev => [t, ...prev]);
+      // create on server
+      (async () => {
+        try {
+          const res = await fetch(`${API_BASE}/tasks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: t.name, incentive: t.incentive }) });
+          if (res.ok) {
+            const created = await res.json();
+            setTasks(prev => prev.map(pt => pt.id === t.id ? { ...pt, id: created._id || created.id } : pt));
+          }
+        } catch (err) {
+          console.warn('Failed to create task on server', err);
+          setOffline(true);
+        }
+      })();
     }
     setForm({ name: '', incentive: '' });
     setEditing(null);
@@ -69,6 +138,17 @@ export default function TaskManager() {
   function remove(id: string) {
     if (!confirm('Delete this task?')) return;
     setTasks(prev => prev.filter(t => t.id !== id));
+    // delete on server if possible
+    (async () => {
+      try {
+        if (/^\w{24}$/.test(id)) {
+          await fetch(`${API_BASE}/tasks/${id}`, { method: 'DELETE' });
+        }
+      } catch (err) {
+        console.warn('Failed to delete task on server', err);
+        setOffline(true);
+      }
+    })();
   }
 
   function moveUp(id: string) {
@@ -79,6 +159,18 @@ export default function TaskManager() {
       const tmp = copy[i-1];
       copy[i-1] = copy[i];
       copy[i] = tmp;
+      // persist order
+      (async () => {
+        try {
+          await Promise.all(copy.map((t, idx) => {
+            if (/^\w{24}$/.test(t.id)) return fetch(`${API_BASE}/tasks/${t.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order: idx }) });
+            return Promise.resolve();
+          }));
+        } catch (err) {
+          console.warn('Failed to persist order', err);
+          setOffline(true);
+        }
+      })();
       return copy;
     });
   }
@@ -91,6 +183,18 @@ export default function TaskManager() {
       const tmp = copy[i+1];
       copy[i+1] = copy[i];
       copy[i] = tmp;
+      // persist order
+      (async () => {
+        try {
+          await Promise.all(copy.map((t, idx) => {
+            if (/^\w{24}$/.test(t.id)) return fetch(`${API_BASE}/tasks/${t.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order: idx }) });
+            return Promise.resolve();
+          }));
+        } catch (err) {
+          console.warn('Failed to persist order', err);
+          setOffline(true);
+        }
+      })();
       return copy;
     });
   }
