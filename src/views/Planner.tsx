@@ -4,7 +4,9 @@ import { X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CirclePoundSterling } from 'lucide-react';
 
-const API = (import.meta as any).env.VITE_API_URL || 'http://localhost:3000';
+const API = import.meta.env.VITE_API_URL; 
+// const API = import.meta.env.VITE_API_URL ?? 'https://finan-back-qmph.onrender.com';
+
 
 type Task = {
   id: string;
@@ -185,25 +187,25 @@ export default function Planner() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="w-full px-4 py-4 sm:px-6 max-w-5xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h2 className="text-2xl font-semibold">Weekly Planner</h2>
           <p className="text-sm text-slate-500">Mark daily tasks and claim Rewards</p>
         </div>
-        <div>
-          <button onClick={() => navigate('/taskmanager')} className="px-3 py-2 bg-indigo-600 text-white rounded-lg">Tasks</button>
+        <div className="w-full sm:w-auto">
+          <button onClick={() => navigate('/taskmanager')} className="w-full sm:w-auto px-3 py-2 bg-indigo-600 text-white rounded-lg">Tasks</button>
         </div>
       </div>
 
       {/* week header */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4 overflow-x-auto">
         {days.map(d => {
           const iso = d.toISOString().slice(0, 10);
           const label = d.toLocaleDateString('en-US', { weekday: 'short' });
           const isToday = iso === todayISO();
           const classes = `px-3 py-2 rounded-lg cursor-pointer ${iso === selectedDate ? 'bg-indigo-600 text-white' : isToday ? 'bg-amber-100 text-amber-800 ring-2 ring-amber-200' : 'bg-slate-100 text-slate-700'}`;
-          return <button key={iso} className={classes} onClick={() => setSelectedDate(iso)}>{label}</button>;
+          return <button key={iso} className={`${classes} whitespace-nowrap shrink-0`} onClick={() => setSelectedDate(iso)}>{label}</button>;
         })}
       </div>
 
@@ -215,37 +217,36 @@ export default function Planner() {
         ) : (
           <div className="space-y-3">
             {tasks.map((t) => (
-              <div key={t.id} className="flex items-center justify-between p-4 rounded-xl shadow-lg bg-linear-to-br from-white to-slate-50">
-                <div className="flex items-center gap-4">
-                  {/* <div className="w-14 h-14 rounded-xl bg-linear-to-br from-indigo-500 to-emerald-400 flex items-center justify-center text-white font-bold text-lg">{String(idx+1)}</div> */}
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" checked={isCompletedOn(selectedDate, t.id)} onChange={() => toggleTask(selectedDate, t.id)} className="w-5 h-5" />
-                    <div>
-                      <div className="text-lg font-semibold">{t.name}</div>
+              <div key={t.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 rounded-xl shadow-lg bg-linear-to-br from-white to-slate-50">
+                <div className="flex items-start sm:items-center gap-4 w-full">
+                  <label className="flex items-center gap-3 cursor-pointer w-full">
+                    <input type="checkbox" checked={isCompletedOn(selectedDate, t.id)} onChange={() => toggleTask(selectedDate, t.id)} className="w-5 h-5 shrink-0" />
+                    <div className="min-w-0">
+                      <div className="text-lg font-semibold truncate">{t.name}</div>
                       {t.incentive && <div className="text-sm text-slate-500 mt-1 flex items-center gap-1">
                         <span className="py-0.5 bg-amber-50 border border-amber-100 rounded">
                           <CirclePoundSterling size={16} />
                         </span>
-                        <span>{t.incentive}</span>
+                        <span className="truncate">{t.incentive}</span>
                       </div>}
                     </div>
                   </label>
                 </div>
-                <div className="text-sm text-slate-500">{isCompletedOn(selectedDate, t.id) ? 'Done' : 'Pending'}</div>
+                <div className="text-sm text-slate-500 mt-2 sm:mt-0 sm:ml-4 shrink-0">{isCompletedOn(selectedDate, t.id) ? 'Done' : 'Pending'}</div>
               </div>
             ))}
           </div>
         )}
 
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="text-sm">Total Rewards: <span className="font-semibold">{totalIncentive.toFixed(2)}</span></div>
-          <div>
+          <div className="w-full sm:w-auto">
             {isClaimed ? (
               <div className="flex items-center gap-3">
                 <div className="text-sm text-emerald-600">Claimed: {claims[selectedDate].amount}</div>
               </div>
             ) : (
-              <button onClick={openClaim} className="px-4 py-2 bg-emerald-600 text-white rounded">Claim</button>
+              <button onClick={openClaim} className="w-full sm:w-auto px-4 py-2 bg-emerald-600 text-white rounded">Claim</button>
             )}
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   Search, Download, Share2,
   TrendingUp, TrendingDown, DollarSign, Clock, CheckCircle, 
@@ -333,6 +333,7 @@ function getPaymentMethodIcon(method: string) {
 }
 
 export default function History() {
+  const API_BASE = (import.meta as any).env.VITE_API_URL ?? 'http://localhost:3000';
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
@@ -343,16 +344,70 @@ export default function History() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [selectedTransaction, setSelectedTransaction] = useState<DetailedTransaction | null>(null);
+  const [transactions, setTransactions] = useState<DetailedTransaction[]>(mockHistoryData);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Get unique categories for filter
+  useEffect(() => { fetchTransactions(); window.addEventListener('transaction:created', fetchTransactions); return () => window.removeEventListener('transaction:created', fetchTransactions); }, []);
+
+  async function fetchTransactions() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE}/transactions`);
+      if (!res.ok) throw new Error('Failed to load transactions');
+      const data = await res.json();
+      // Map backend transaction model to DetailedTransaction shape used by this view
+      const mapped: DetailedTransaction[] = Array.isArray(data) ? data.map((t: any) => ({
+        id: t._id || t.id,
+        title: t.title || (t.description ? t.description.slice(0, 40) : 'Transaction'),
+        description: t.remark || t.description || '',
+        category: t.category || 'Other',
+        subcategory: t.subcategory || '',
+        date: t.createdAt || t.date || new Date().toISOString(),
+        time: (t.createdAt && new Date(t.createdAt).toLocaleTimeString()) || t.time || '',
+        amount: Number(t.amount || 0),
+        type: t.type === 'income' ? 'income' : 'expense',
+        status: t.status || 'completed',
+        paymentMethod: t.paymentMethod || 'card',
+        location: t.location || (t.card && t.card.accountName) || '',
+        tags: t.tags || [],
+        notes: t.notes || t.remark || '',
+        receipt: t.receipt || '',
+        recurring: !!t.recurring,
+        frequency: t.frequency || undefined,
+      })) : [];
+      setTransactions(mapped);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to load transactions');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function deleteTransaction(id: string) {
+    if (!confirm('Delete this transaction?')) return;
+    try {
+      const res = await fetch(`${API_BASE}/transactions/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete transaction');
+      setTransactions(prev => prev.filter(t => t.id !== id));
+      setSelectedTransaction(null);
+      // notify other parts of the app
+      window.dispatchEvent(new CustomEvent('transaction:created'));
+    } catch (err: any) {
+      alert(err?.message || 'Delete failed');
+    }
+  }
+
+  // Get unique categories for filter (from real transactions)
   const categories = useMemo(() => {
-    const uniqueCategories = [...new Set(mockHistoryData.map(t => t.category))];
+    const uniqueCategories = [...new Set(transactions.map(t => t.category || 'Other'))];
     return uniqueCategories.sort();
-  }, []);
+  }, [transactions]);
 
-  // Filter and sort transactions
+  // Filter and sort transactions (use real data)
   const filteredTransactions = useMemo(() => {
-    let filtered = mockHistoryData;
+    let filtered = transactions;
 
     // Search filter
     if (searchTerm) {
@@ -422,7 +477,7 @@ export default function History() {
     });
 
     return filtered;
-  }, [searchTerm, selectedCategory, selectedStatus, selectedType, dateRange, sortBy, sortOrder]);
+  }, [transactions, searchTerm, selectedCategory, selectedStatus, selectedType, dateRange, sortBy, sortOrder]);
 
   // Pagination
   const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
@@ -449,19 +504,19 @@ export default function History() {
   }, [filteredTransactions]);
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-4 space-y-6">
+    <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Transaction History</h1>
           <p className="text-slate-600">Complete transaction details and analytics</p>
         </div>
         
         <div className="flex items-center gap-3">
-          <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+          <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors" aria-label="Download">
             <Download className="w-5 h-5 text-slate-600" />
           </button>
-          <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+          <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors" aria-label="Share">
             <Share2 className="w-5 h-5 text-slate-600" />
           </button>
         </div>
@@ -469,7 +524,7 @@ export default function History() {
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
+        <div className="bg-white rounded-xl p-4 md:p-6 shadow-sm border border-slate-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-600">Total Income</p>
@@ -481,7 +536,7 @@ export default function History() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
+        <div className="bg-white rounded-xl p-4 md:p-6 shadow-sm border border-slate-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-600">Total Expenses</p>
@@ -493,7 +548,7 @@ export default function History() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
+        <div className="bg-white rounded-xl p-4 md:p-6 shadow-sm border border-slate-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-600">Net Balance</p>
@@ -507,7 +562,7 @@ export default function History() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
+        <div className="bg-white rounded-xl p-4 md:p-6 shadow-sm border border-slate-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-600">Transactions</p>
@@ -524,7 +579,7 @@ export default function History() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
+      <div className="bg-white rounded-xl p-4 md:p-6 shadow-sm border border-slate-100">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           {/* Search */}
           <div className="lg:col-span-2">
@@ -601,10 +656,10 @@ export default function History() {
               <option value="year">Last Year</option>
             </select>
           </div>
-        </div>
+  </div>
 
         {/* Sort Controls */}
-        <div className="flex items-center gap-4 mt-4 pt-4 border-t border-slate-200">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-4 pt-4 border-t border-slate-200">
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium text-slate-700">Sort by:</label>
             <select
@@ -617,7 +672,7 @@ export default function History() {
               <option value="category">Category</option>
             </select>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium text-slate-700">Order:</label>
             <select
@@ -642,18 +697,18 @@ export default function History() {
           {currentTransactions.map((transaction) => (
             <div 
               key={transaction.id} 
-              className="p-6 hover:bg-slate-50 transition-colors cursor-pointer"
+              className="p-4 hover:bg-slate-50 transition-colors cursor-pointer"
               onClick={() => setSelectedTransaction(transaction)}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-slate-100 rounded-lg">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start sm:items-center gap-4 w-full">
+                  <div className="p-3 bg-slate-100 rounded-lg shrink-0">
                     {getCategoryIcon(transaction.category)}
                   </div>
-                  
-                  <div className="flex-1">
+
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-semibold text-slate-800">{transaction.title}</h3>
+                      <h3 className="font-semibold text-slate-800 truncate">{transaction.title}</h3>
                       <div className="flex items-center gap-1">
                         {getStatusIcon(transaction.status)}
                         <span className="text-xs font-medium text-slate-600 capitalize">
@@ -666,27 +721,27 @@ export default function History() {
                         </span>
                       )}
                     </div>
-                    
-                    <div className="flex items-center gap-4 text-sm text-slate-600 mb-2">
-                      <span>{transaction.category}</span>
+
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600 mb-2">
+                      <span className="truncate">{transaction.category}</span>
                       <span>•</span>
-                      <span>{formatDate(transaction.date)}</span>
+                      <span className="truncate">{formatDate(transaction.date)}</span>
                       <span>•</span>
-                      <span>{transaction.time}</span>
+                      <span className="truncate">{transaction.time}</span>
                       {transaction.location && (
                         <>
                           <span>•</span>
-                          <span>{transaction.location}</span>
+                          <span className="truncate">{transaction.location}</span>
                         </>
                       )}
                     </div>
-                    
+
                     {transaction.description && (
-                      <p className="text-sm text-slate-600 mb-2">{transaction.description}</p>
+                      <p className="text-sm text-slate-600 mb-2 truncate">{transaction.description}</p>
                     )}
-                    
+
                     {transaction.tags && transaction.tags.length > 0 && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         {transaction.tags.map((tag, index) => (
                           <span 
                             key={index}
@@ -700,19 +755,17 @@ export default function History() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
+                <div className="flex items-center gap-4 mt-3 sm:mt-0 sm:ml-4 shrink-0">
+                  <div className="w-full sm:w-auto text-right">
                     <div className={`text-lg font-bold ${
                       transaction.type === 'income' ? 'text-emerald-600' : 'text-slate-800'
-                    }`}>
-                      {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-slate-500">
+                    } whitespace-nowrap`}>{transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}</div>
+                    <div className="flex items-center gap-2 text-sm text-slate-500 justify-end">
                       {getPaymentMethodIcon(transaction.paymentMethod)}
                       <span className="capitalize">{transaction.paymentMethod.replace('_', ' ')}</span>
                     </div>
                   </div>
-                  
+
                   <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
                     transaction.type === 'income' 
                       ? 'bg-emerald-100 text-emerald-600' 
@@ -724,7 +777,7 @@ export default function History() {
                       <ArrowDownLeft className="w-5 h-5" />
                     )}
                   </div>
-                  
+
                   <button className="p-2 hover:bg-slate-200 rounded-lg transition-colors">
                     <MoreHorizontal className="w-4 h-4 text-slate-400" />
                   </button>
@@ -737,11 +790,8 @@ export default function History() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-          <div className="text-sm text-slate-600">
-            Page {currentPage} of {totalPages}
-          </div>
-          
+        <div className="flex flex-col sm:flex-row items-center sm:justify-between bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-slate-100 gap-3">
+          <div className="text-sm text-slate-600">Page {currentPage} of {totalPages}</div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
@@ -750,24 +800,26 @@ export default function History() {
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              const page = i + 1;
-              return (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${
-                    currentPage === page 
-                      ? 'bg-indigo-600 text-white' 
-                      : 'text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  {page}
-                </button>
-              );
-            })}
-            
+
+            <div className="hidden sm:flex items-center gap-2">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const page = i + 1;
+                return (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${
+                      currentPage === page 
+                        ? 'bg-indigo-600 text-white' 
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                );
+              })}
+            </div>
+
             <button
               onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
@@ -876,7 +928,7 @@ export default function History() {
                 <Copy className="w-4 h-4 mr-2" />
                 Duplicate
               </button>
-              <button className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+              <button onClick={() => selectedTransaction && deleteTransaction(selectedTransaction.id)} className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                 <Trash2 className="w-4 h-4 mr-2" />
                 Delete
               </button>

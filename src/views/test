@@ -1,0 +1,11 @@
+import { useEffect, useMemo, useState } from "react";
+const API = import.meta.env.VITE_API_URL; 
+function Reports() {
+  return (
+    <>
+      <div>Reports View</div>
+      <div>{API}</div> 
+    </>
+  );
+}
+export default Reports;

@@ -9,6 +9,7 @@ import Settings from './views/Settings';
 import BottomNav from './views/BottomNav';
 import ManageCards from './views/ManageCards';
 import AddTransactionModal from './components/AddTransactionModal';
+import History from './views/History';
 
 function NotFound() {
   return (
@@ -61,6 +62,7 @@ export default function App() {
           <Route path="/reports" element={<Reports />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/manage-cards" element={<ManageCards />} />
+          <Route path="/history" element={<History />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>

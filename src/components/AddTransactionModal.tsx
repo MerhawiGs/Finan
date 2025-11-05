@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { useCardContext } from '../contexts/CardContext';
 
-// const API = 'http://localhost:3000';
-// const API = process.env.VITE_API_URL ?? 'https://finan-back-qmph.onrender.com';
-const API = import.meta.env.VITE_API_URL ?? 'https://finan-back-qmph.onrender.com';
+const API = import.meta.env.VITE_API_URL; 
+// const API = import.meta.env.VITE_API_URL ?? 'https://finan-back-qmph.onrender.com';
+
 type Props = {
   open: boolean;
   onClose: () => void;

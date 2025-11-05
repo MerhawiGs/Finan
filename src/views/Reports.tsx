@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { 
-  TrendingUp, TrendingDown, DollarSign, Target, AlertCircle, 
+  TrendingUp, Target, AlertCircle, 
   Download, Share2, EyeOff,
-  BarChart3, Wallet,
+  Wallet,
   Home, ShoppingCart, Car, Coffee, Zap, Heart, BookOpen,
   Lightbulb
 } from 'lucide-react';
@@ -20,8 +20,8 @@ const mockBudgets = [
 ];
 
 // goals will be loaded from the backend /goals
-
-const API_BASE = (import.meta as any).env.VITE_API_URL || 'http://localhost:3000';
+const API_BASE = (import.meta as any).env.VITE_API_URL ?? 'http://localhost:3000'; 
+// const API_BASE = (import.meta as any).env.VITE_API_URL || 'http://localhost:3000';
 
 function formatCurrency(amount: number) {
   return amount.toLocaleString('en-ET', { style: 'currency', currency: 'ETB' });
@@ -39,7 +39,7 @@ function getCategoryIcon(category: string) {
     case 'utilities': return <Zap className={`${iconClass} text-yellow-600`} />;
     case 'health': return <Heart className={`${iconClass} text-red-600`} />;
     case 'education': return <BookOpen className={`${iconClass} text-teal-600`} />;
-    default: return <DollarSign className={`${iconClass} text-gray-600`} />;
+    default: return <Wallet className={`${iconClass} text-gray-600`} />;
   }
 }
 
@@ -79,11 +79,19 @@ export default function Reports() {
   const [moneyCardId, setMoneyCardId] = useState<string | null>(null);
   const [moneyError, setMoneyError] = useState<string | null>(null);
 
+  // Live reports collapsed by default
+  const [liveCollapsed, setLiveCollapsed] = useState(true);
+
   useEffect(() => {
     const onTxCreated = () => fetchData();
     window.addEventListener('transaction:created', onTxCreated as EventListener);
     fetchData();
-    return () => window.removeEventListener('transaction:created', onTxCreated as EventListener);
+    // Poll for new data every 15s to approximate realtime
+    const iv = setInterval(() => fetchData(), 15000);
+    return () => {
+      window.removeEventListener('transaction:created', onTxCreated as EventListener);
+      clearInterval(iv);
+    };
   }, []);
 
   async function fetchData() {
@@ -178,7 +186,48 @@ export default function Reports() {
       budgetPerformance,
       transactionCount: filteredTransactions.length
     };
-  }, [timeRange]);
+  }, [timeRange, transactions]);
+
+  // Realtime derived reports
+  const topMerchants = useMemo(() => {
+    const map: Record<string, { count: number; amount: number }> = {};
+    for (const t of transactions) {
+      const key = (t.location || t.title || 'Unknown').toString();
+      map[key] = map[key] || { count: 0, amount: 0 };
+      map[key].count += 1;
+      map[key].amount += Number(t.amount || 0);
+    }
+    return Object.entries(map)
+      .map(([k, v]) => ({ name: k, ...v }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5);
+  }, [transactions]);
+
+  const avgDailySpend = useMemo(() => {
+    // average expense per day over last 7 days
+    const now = new Date();
+    const dayMap: Record<string, number> = {};
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(now);
+      d.setDate(now.getDate() - i);
+      dayMap[d.toISOString().slice(0,10)] = 0;
+    }
+    for (const t of transactions) {
+      if (t.type !== 'expense') continue;
+      const d = new Date(t.date).toISOString().slice(0,10);
+      if (d in dayMap) dayMap[d] += Number(t.amount || 0);
+    }
+    const values = Object.values(dayMap);
+    const sum = values.reduce((s, v) => s + v, 0);
+    return values.length ? sum / values.length : 0;
+  }, [transactions]);
+
+  const largestTransactions = useMemo(() => {
+    return transactions
+      .slice()
+      .sort((a: any, b: any) => Math.abs(Number(b.amount || 0)) - Math.abs(Number(a.amount || 0)))
+      .slice(0, 5);
+  }, [transactions]);
 
   const insights = useMemo(() => {
     const insights = [];
@@ -249,6 +298,7 @@ export default function Reports() {
     const card = cards.find((c: any) => c._id === moneyCardId);
     const remaining = Math.max(0, Number(goal?.target || 0) - Number(goal?.current || 0));
     const cardBalance = Number(card?.availableBalance ?? 0);
+  const percentFunded = goal && Number(goal?.target) ? (Number(goal?.current || 0) / Number(goal?.target)) * 100 : 0;
     if (amount > remaining) {
       setMoneyError(`Amount exceeds remaining goal amount (${formatCurrency(remaining)})`);
       return;
@@ -262,7 +312,13 @@ export default function Reports() {
       const res = await fetch(`${API_BASE}/cards/${moneyCardId}/transaction`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'expense', amount, title: `Goal: ${moneyGoalId}`, category: 'Goal', remark: `Add to goal` })
+        body: JSON.stringify({
+          type: 'expense',
+          amount,
+          title: `Goal: ${goal?.title || ''} ${percentFunded.toFixed(0)}% funded`,
+          category: 'Goal',
+          remark: `Add to goal`,
+        })
       });
       if (!res.ok) throw new Error('Failed to charge card');
       await res.json();
@@ -346,29 +402,28 @@ export default function Reports() {
   }, [goals]);
 
   return (
-    <div className="w-full max-w-6xl mx-auto p-4 space-y-6">
+    <div className="max-w-6xl mx-auto p-4 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Financial Reports</h1>
-          <p className="text-slate-600">Comprehensive insights into your financial health</p>
+          <p className="text-slate-600">Comprehensive insights</p>
         </div>
         
         <div className="flex items-center gap-3">
-          <div className="flex bg-slate-100 rounded-lg p-1">
-            {(['week', 'month', 'quarter', 'year'] as const).map((range) => (
-              <button
-                key={range}
-                onClick={() => setTimeRange(range)}
-                className={`px-3 py-1 text-sm font-medium rounded-md transition-colors capitalize ${
-                  timeRange === range 
-                    ? 'bg-white text-slate-800 shadow-sm' 
-                    : 'text-slate-600 hover:text-slate-800'
-                }`}
-              >
-                {range}
-              </button>
-            ))}
+          <div>
+            <label htmlFor="timeRangeSelect" className="sr-only">Time range</label>
+            <select
+              id="timeRangeSelect"
+              value={timeRange}
+              onChange={e => setTimeRange(e.target.value as any)}
+              className="p-2 text-sm rounded-md bg-slate-100 border border-transparent focus:ring-0"
+            >
+              <option value="week">week</option>
+              <option value="month">month</option>
+              <option value="quarter">quarter</option>
+              <option value="year">year</option>
+            </select>
           </div>
           
           <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
@@ -385,62 +440,64 @@ export default function Reports() {
         <div className="text-sm text-slate-600">Loading financial data…</div>
       )}
 
+      {/* Live Reports - near realtime summaries (collapsible) */}
+      <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-slate-100">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-semibold text-slate-800">Live Reports</h3>
+          <button
+            onClick={() => setLiveCollapsed(v => !v)}
+            aria-expanded={!liveCollapsed}
+            className="px-2 py-1 text-sm bg-slate-100 rounded-md"
+          >
+            {liveCollapsed ? 'Show' : 'Hide'}
+          </button>
+        </div>
+
+        {!liveCollapsed && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-3 rounded-lg border border-slate-100">
+              <h4 className="font-medium mb-2">Top Merchants</h4>
+              <div className="space-y-2">
+                {topMerchants.length === 0 && <div className="text-sm text-slate-500">No merchant data</div>}
+                {topMerchants.map((m: any) => (
+                  <div key={m.name} className="flex items-center justify-between">
+                    <div className="text-sm truncate">{m.name}</div>
+                    <div className="text-sm text-slate-600">{formatCurrency(m.amount)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg border border-slate-100">
+              <h4 className="font-medium mb-2">Avg Daily Spend (7d)</h4>
+              <div className="text-2xl font-semibold text-rose-600">{formatCurrency(avgDailySpend)}</div>
+              <div className="text-xs text-slate-500 mt-2">Average of expense totals over the last 7 days</div>
+            </div>
+
+            <div className="p-3 rounded-lg border border-slate-100">
+              <h4 className="font-medium mb-2">Largest Transactions</h4>
+              <div className="space-y-2">
+                {largestTransactions.length === 0 && <div className="text-sm text-slate-500">No transactions</div>}
+                {largestTransactions.map((t: any) => (
+                  <div key={t._id || t.id} className="flex items-center justify-between">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium truncate">{t.title || t.description || 'Transaction'}</div>
+                      <div className="text-xs text-slate-500">{new Date(t.date).toLocaleDateString()}</div>
+                    </div>
+                    <div className="text-sm font-semibold ml-4 whitespace-nowrap">{formatCurrency(Number(t.amount || 0))}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {error && (
         <div className="text-sm text-red-600">{error}</div>
       )}
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600">Total Income</p>
-              <p className="text-2xl font-bold text-emerald-600">{formatCurrency(analytics.income)}</p>
-            </div>
-            <div className="p-3 bg-emerald-100 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-emerald-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600">Total Expenses</p>
-              <p className="text-2xl font-bold text-rose-600">{formatCurrency(analytics.expenses)}</p>
-            </div>
-            <div className="p-3 bg-rose-100 rounded-lg">
-              <TrendingDown className="w-6 h-6 text-rose-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600">Net Balance</p>
-              <p className={`text-2xl font-bold ${analytics.net >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                {formatCurrency(analytics.net)}
-              </p>
-            </div>
-            <div className={`p-3 rounded-lg ${analytics.net >= 0 ? 'bg-emerald-100' : 'bg-rose-100'}`}>
-              <DollarSign className={`w-6 h-6 ${analytics.net >= 0 ? 'text-emerald-600' : 'text-rose-600'}`} />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-600">Transactions</p>
-              <p className="text-2xl font-bold text-slate-800">{analytics.transactionCount}</p>
-            </div>
-            <div className="p-3 bg-slate-100 rounded-lg">
-              <BarChart3 className="w-6 h-6 text-slate-600" />
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Key Metrics removed per request; focusing on category & budget panels */}
 
       {/* Insights Section */}
       {showInsights && insights.length > 0 && (
@@ -621,9 +678,9 @@ export default function Reports() {
                   <option value="low">Low</option>
                 </select>
               </div>
-              <div className="flex items-center justify-end gap-2 mt-4">
-                <button onClick={() => setShowAddGoal(false)} className="px-3 py-1">Cancel</button>
-                <button onClick={submitNewGoal} className="px-3 py-1 bg-indigo-600 text-white rounded">Create</button>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 mt-4">
+                <button onClick={() => setShowAddGoal(false)} className="px-3 py-1 w-full sm:w-auto">Cancel</button>
+                <button onClick={submitNewGoal} className="px-3 py-1 bg-indigo-600 text-white rounded w-full sm:w-auto">Create</button>
               </div>
             </div>
           </div>
@@ -650,8 +707,8 @@ export default function Reports() {
                   })()}
                 </div>
               </div>
-              <div className="flex items-center justify-end gap-2 mt-4">
-                <button onClick={() => setShowAddMoney(false)} className="px-3 py-1">Cancel</button>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 mt-4">
+                <button onClick={() => setShowAddMoney(false)} className="px-3 py-1 w-full sm:w-auto">Cancel</button>
                 {(() => {
                   const amountNum = Number(moneyAmount) || 0;
                   const goal = goals.find((g: any) => g.id === moneyGoalId);
@@ -660,7 +717,7 @@ export default function Reports() {
                   const cardBalance = Number(card?.availableBalance ?? 0);
                   const disabled = amountNum <= 0 || amountNum > remaining || amountNum > cardBalance || !moneyCardId;
                   return (
-                    <button disabled={disabled} onClick={submitAddMoney} className={`px-3 py-1 text-white rounded ${disabled ? 'bg-slate-300' : 'bg-indigo-600'}`}>
+                    <button disabled={disabled} onClick={submitAddMoney} className={`px-3 py-1 text-white rounded w-full sm:w-auto ${disabled ? 'bg-slate-300' : 'bg-indigo-600'}`}>
                       Charge Card & Add
                     </button>
                   );

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 import { useCardContext } from '../contexts/CardContext';
+import { Link } from 'react-router-dom';
 
 type TransactionType = 'income' | 'expense' | 'reward';
 
@@ -190,10 +191,8 @@ function getCategoryColor(category: string) {
     default: return 'bg-gray-50 border-gray-200';
   }
 }
-
-// const API = 'http://localhost:3000';
-const API = import.meta.env.VITE_API_URL ?? 'https://finan-back-qmph.onrender.com';
-// const API = import.meta.env.VITE_API_URL;
+const API = import.meta.env.VITE_API_URL; 
+// const API = import.meta.env.VITE_API_URL ?? 'https://finan-back-qmph.onrender.com';
 
 export default function RecentTransactions({ transactions, onViewAll }: RecentTransactionsProps) {
   const { selectedCardId } = useCardContext();
@@ -351,12 +350,13 @@ export default function RecentTransactions({ transactions, onViewAll }: RecentTr
               <option value="amount">Sort by Amount</option>
             </select>
             
-            <button 
-              onClick={onViewAll || (() => console.log('Navigate to History'))}
-              className="px-3 py-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors"
-            >
-              View All
-            </button>
+            <Link to="/history">
+              <button 
+                className="px-3 py-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors"
+              >
+                View All
+              </button>
+            </Link>
           </div>
         </div>
       </div>

@@ -23,7 +23,9 @@ export default function CompletionLineChart() {
     // fetch aggregated per-task history from backend to build per-task map
     async function load() {
       try {
-        const API_BASE = (import.meta as any).env.VITE_API_URL || 'http://localhost:3000';
+
+        const API_BASE = (import.meta as any).env.VITE_API_URL;
+        // const API_BASE = (import.meta as any).env.VITE_API_URL || 'https://finan-back-qmph.onrender.com';
         const res = await fetch(`${API_BASE}/planner/history`);
         if (!res.ok) throw new Error('Failed to load planner history');
         const arr = await res.json();
