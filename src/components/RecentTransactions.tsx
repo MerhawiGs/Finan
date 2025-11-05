@@ -352,6 +352,7 @@ export default function RecentTransactions({ transactions, onViewAll }: RecentTr
             
             <Link to="/history">
               <button 
+                onClick={() => onViewAll?.()}
                 className="px-3 py-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors"
               >
                 View All

@@ -692,101 +692,124 @@ export default function History() {
       </div>
 
       {/* Transactions List */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="divide-y divide-slate-100">
-          {currentTransactions.map((transaction) => (
-            <div 
-              key={transaction.id} 
-              className="p-4 hover:bg-slate-50 transition-colors cursor-pointer"
-              onClick={() => setSelectedTransaction(transaction)}
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start sm:items-center gap-4 w-full">
-                  <div className="p-3 bg-slate-100 rounded-lg shrink-0">
-                    {getCategoryIcon(transaction.category)}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-semibold text-slate-800 truncate">{transaction.title}</h3>
-                      <div className="flex items-center gap-1">
-                        {getStatusIcon(transaction.status)}
-                        <span className="text-xs font-medium text-slate-600 capitalize">
-                          {transaction.status}
-                        </span>
-                      </div>
-                      {transaction.recurring && (
-                        <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
-                          Recurring
-                        </span>
-                      )}
+      {error ? (
+        <div className="bg-red-50 rounded-xl shadow-sm border border-red-100 p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600" />
+              <div className="text-sm text-red-700">Error loading transactions: {error}</div>
+            </div>
+            <div className="shrink-0">
+              <button
+                onClick={() => setError(null)}
+                className="px-3 py-1 text-sm text-red-700 bg-red-100 rounded-lg hover:bg-red-200 transition-colors"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : loading ? (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 text-center">
+          <div className="text-sm text-slate-600">Loading transactions...</div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="divide-y divide-slate-100">
+            {currentTransactions.map((transaction) => (
+              <div 
+                key={transaction.id} 
+                className="p-4 hover:bg-slate-50 transition-colors cursor-pointer"
+                onClick={() => setSelectedTransaction(transaction)}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start sm:items-center gap-4 w-full">
+                    <div className="p-3 bg-slate-100 rounded-lg shrink-0">
+                      {getCategoryIcon(transaction.category)}
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600 mb-2">
-                      <span className="truncate">{transaction.category}</span>
-                      <span>•</span>
-                      <span className="truncate">{formatDate(transaction.date)}</span>
-                      <span>•</span>
-                      <span className="truncate">{transaction.time}</span>
-                      {transaction.location && (
-                        <>
-                          <span>•</span>
-                          <span className="truncate">{transaction.location}</span>
-                        </>
-                      )}
-                    </div>
-
-                    {transaction.description && (
-                      <p className="text-sm text-slate-600 mb-2 truncate">{transaction.description}</p>
-                    )}
-
-                    {transaction.tags && transaction.tags.length > 0 && (
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {transaction.tags.map((tag, index) => (
-                          <span 
-                            key={index}
-                            className="px-2 py-1 text-xs font-medium bg-slate-100 text-slate-700 rounded-full"
-                          >
-                            #{tag}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="font-semibold text-slate-800 truncate">{transaction.title}</h3>
+                        <div className="flex items-center gap-1">
+                          {getStatusIcon(transaction.status)}
+                          <span className="text-xs font-medium text-slate-600 capitalize">
+                            {transaction.status}
                           </span>
-                        ))}
+                        </div>
+                        {transaction.recurring && (
+                          <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                            Recurring
+                          </span>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
 
-                <div className="flex items-center gap-4 mt-3 sm:mt-0 sm:ml-4 shrink-0">
-                  <div className="w-full sm:w-auto text-right">
-                    <div className={`text-lg font-bold ${
-                      transaction.type === 'income' ? 'text-emerald-600' : 'text-slate-800'
-                    } whitespace-nowrap`}>{transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}</div>
-                    <div className="flex items-center gap-2 text-sm text-slate-500 justify-end">
-                      {getPaymentMethodIcon(transaction.paymentMethod)}
-                      <span className="capitalize">{transaction.paymentMethod.replace('_', ' ')}</span>
+                      <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600 mb-2">
+                        <span className="truncate">{transaction.category}</span>
+                        <span>•</span>
+                        <span className="truncate">{formatDate(transaction.date)}</span>
+                        <span>•</span>
+                        <span className="truncate">{transaction.time}</span>
+                        {transaction.location && (
+                          <>
+                            <span>•</span>
+                            <span className="truncate">{transaction.location}</span>
+                          </>
+                        )}
+                      </div>
+
+                      {transaction.description && (
+                        <p className="text-sm text-slate-600 mb-2 truncate">{transaction.description}</p>
+                      )}
+
+                      {transaction.tags && transaction.tags.length > 0 && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {transaction.tags.map((tag, index) => (
+                            <span 
+                              key={index}
+                              className="px-2 py-1 text-xs font-medium bg-slate-100 text-slate-700 rounded-full"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
-                    transaction.type === 'income' 
-                      ? 'bg-emerald-100 text-emerald-600' 
-                      : 'bg-rose-100 text-rose-600'
-                  }`}>
-                    {transaction.type === 'income' ? (
-                      <ArrowUpRight className="w-5 h-5" />
-                    ) : (
-                      <ArrowDownLeft className="w-5 h-5" />
-                    )}
-                  </div>
+                  <div className="flex items-center gap-4 mt-3 sm:mt-0 sm:ml-4 shrink-0">
+                    <div className="w-full sm:w-auto text-right">
+                      <div className={`text-lg font-bold ${
+                        transaction.type === 'income' ? 'text-emerald-600' : 'text-slate-800'
+                      } whitespace-nowrap`}>{transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}</div>
+                      <div className="flex items-center gap-2 text-sm text-slate-500 justify-end">
+                        {getPaymentMethodIcon(transaction.paymentMethod)}
+                        <span className="capitalize">{transaction.paymentMethod.replace('_', ' ')}</span>
+                      </div>
+                    </div>
 
-                  <button className="p-2 hover:bg-slate-200 rounded-lg transition-colors">
-                    <MoreHorizontal className="w-4 h-4 text-slate-400" />
-                  </button>
+                    <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
+                      transaction.type === 'income' 
+                        ? 'bg-emerald-100 text-emerald-600' 
+                        : 'bg-rose-100 text-rose-600'
+                    }`}>
+                      {transaction.type === 'income' ? (
+                        <ArrowUpRight className="w-5 h-5" />
+                      ) : (
+                        <ArrowDownLeft className="w-5 h-5" />
+                      )}
+                    </div>
+
+                    <button className="p-2 hover:bg-slate-200 rounded-lg transition-colors">
+                      <MoreHorizontal className="w-4 h-4 text-slate-400" />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Pagination */}
       {totalPages > 1 && (
